@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Intake Form</title>
+<link rel="stylesheet" href="charcoal.css">
+<style>
+  .address-line {
+    display: flex;
+    gap: 0.75rem;
+  }
+  .address-line .form-field {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  .address-line .form-field input,
+  .address-line .form-field select {
+    flex-grow: 1;
+  }
+  .address-line .form-field.street { flex-basis: 40%; max-width: 40%; }
+  .address-line .form-field.city { flex-basis: 30%; max-width: 30%; }
+  .address-line .form-field.state { flex-basis: 10%; max-width: 10%; }
+  .address-line .form-field.zip { flex-basis: 20%; max-width: 20%; }
+
+  .address-line .form-field label {
+    white-space: nowrap;
+    margin-bottom: 0.3rem;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+  }
+
+  #claimant-section .grid.two-col .form-field {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .form-field .field-label.hidden-label {
+      display: none;
+  }
+</style>
+</head>
+<body>
+<header class="site-header">
+<div class="site-title">Intake Form</div>
+<nav class="site-nav">
+<div class="menu-group">
+<button class="btn btn-primary" onclick="location.href='dashboard.html'">Dashboard</button>
+<div class="dropdown">
+<button class="btn">Forms ▾</button>
+<div class="dropdown-menu">
+<a href="intake.html">Intake</a>
+<a href="schedule-interview.html">Schedule Interview</a>
+<a href="update.html">Update</a>
+<a href="report-submission.html">Report Submission</a>
+<a href="billing.html">Billing</a>
+</div>
+</div>
+<div class="dropdown">
+<button class="btn">Reports ▾</button>
+<div class="dropdown-menu">
+<a href="scorecard.html">Scorecard</a>
+<a href="pipeline.html">Pipeline</a>
+</div>
+</div>
+</div>
+</nav>
+</header>
+
+<main class="content">
+<section class="form-container" id="intake-form">
+<form id="intakeForm">
+<h1 class="form-title">Intake Form</h1>
+
+<h3 class="section-header">Assignment</h3>
+<section class="form-section" id="assignment-section">
+<div class="grid three-col">
+  <div class="form-field">
+    <label for="assignmentClaimNumber" class="field-label">Claim Number</label>
+    <input type="text" id="assignmentClaimNumber" data-section="assignment" autocomplete="off" placeholder="Enter Claim Number">
+  </div>
+  <div class="form-field">
+    <label for="assignmentInjuryDate" class="field-label">Date of Injury</label>
+    <input type="date" id="assignmentInjuryDate" data-section="assignment">
+  </div>
+  <div class="form-field">
+    <label for="assignmentService" class="field-label">Service</label>
+    <select id="assignmentService" data-section="assignment">
+      <option value="AOE/COE">AOE/COE</option>
+      <option value="Liability">Liability</option>
+      <option value="Surveillance">Surveillance</option>
+      <option value="Ergo">Ergo</option>
+      <option value="Police Report">Police Report</option>
+      <option value="Records Request">Records Request</option>
+    </select>
+  </div>
+</div>
+
+<div class="grid three-col">
+  <div class="form-field">
+    <label for="assignmentAssignmentDate" class="field-label">Date of Assignment</label>
+    <input type="date" id="assignmentAssignmentDate" data-section="assignment">
+  </div>
+  <div class="form-field">
+    <label for="assignmentDueDate" class="field-label">Due Date</label>
+    <input type="date" id="assignmentDueDate" data-section="assignment">
+  </div>
+  <div class="form-field">
+    <label for="assignmentDecisionDate" class="field-label">Decision Date</label>
+    <input type="date" id="assignmentDecisionDate" data-section="assignment">
+  </div>
+</div>
+
+<div class="grid three-col">
+  <div class="form-field">
+    <label for="assignmentStatus" class="field-label">Status</label>
+    <select id="assignmentStatus" data-section="assignment">
+      <option value="Open">Open</option>
+      <option value="Closed">Closed</option>
+      <option value="On Hold">On Hold</option>
+    </select>
+  </div>
+  <div class="form-field">
+    <label for="investigatorName" class="field-label">Investigator</label>
+    <select id="investigatorName" data-section="investigator"></select>
+  </div>
+  <div class="form-field">
+    <label for="assignmentPipelineStage" class="field-label">Pipeline Stage</label>
+    <input type="text" id="assignmentPipelineStage" data-section="assignment" placeholder="Enter Pipeline Stage" list="pipelineStageList">
+    <datalist id="pipelineStageList"></datalist>
+  </div>
+</div>
+</section>
+
+<h3 class="section-header">Client Information</h3>
+<section class="form-section" id="client-section">
+<div class="grid two-col">
+  <div class="form-field">
+    <label for="clientName" class="field-label">Adjuster Name</label>
+    <input type="text" id="clientName" data-section="client" placeholder="Adjuster Name" list="clientNameList">
+    <datalist id="clientNameList"></datalist>
+  </div>
+  <div class="form-field">
+    <label for="clientCompany" class="field-label">Company</label>
+    <input type="text" id="clientCompany" data-section="client" placeholder="Company" list="clientCompanyList">
+    <datalist id="clientCompanyList"></datalist>
+  </div>
+</div>
+
+<div class="grid three-col">
+  <div class="form-field">
+    <label for="clientTitle" class="field-label">Title</label>
+    <input type="text" id="clientTitle" data-section="client" placeholder="Title" value="Claims Examiner">
+  </div>
+  <div class="form-field">
+    <label for="clientPhone" class="field-label">Phone</label>
+    <input type="tel" id="clientPhone" data-section="client" placeholder="Phone">
+  </div>
+  <div class="form-field">
+    <label for="clientEmail" class="field-label">Email</label>
+    <input type="email" id="clientEmail" data-section="client" placeholder="Email">
+  </div>
+</div>
+
+<div class="address-line">
+  <div class="form-field street">
+    <label for="clientStreet" class="field-label">Street Address</label>
+    <input type="text" id="clientStreet" data-section="client" placeholder="Street Address">
+  </div>
+  <div class="form-field city">
+    <label for="clientCity" class="field-label">City</label>
+    <input type="text" id="clientCity" data-section="client" placeholder="City">
+  </div>
+  <div class="form-field state">
+    <label for="clientState" class="field-label">State</label>
+    <input type="text" id="clientState" data-section="client" list="stateList" value="CA" placeholder="State">
+    <datalist id="stateList"></datalist>
+  </div>
+  <div class="form-field zip">
+    <label for="clientZip" class="field-label">ZIP</label>
+    <input type="text" id="clientZip" data-section="client" placeholder="ZIP" maxlength="10">
+  </div>
+</div>
+</section>
+
+<h3 class="section-header">Attorney Information</h3>
+<section class="form-section" id="attorney-section">
+<div class="grid two-col">
+  <div class="form-field">
+    <label for="attorneyName" class="field-label">Attorney Name</label>
+    <input type="text" id="attorneyName" data-section="attorney" placeholder="Attorney Name" list="attorneyNameList">
+    <datalist id="attorneyNameList"></datalist>
+  </div>
+  <div class="form-field">
+    <label for="attorneyCompany" class="field-label">Law Firm</label>
+    <input type="text" id="attorneyCompany" data-section="attorney" placeholder="Law Firm" list="attorneyCompanyList">
+    <datalist id="attorneyCompanyList"></datalist>
+  </div>
+</div>
+
+<div class="grid three-col">
+  <div class="form-field">
+    <label for="attorneyTitle" class="field-label">Title</label>
+    <input type="text" id="attorneyTitle" data-section="attorney" placeholder="Title" value="Attorney">
+  </div>
+  <div class="form-field">
+    <label for="attorneyPhone" class="field-label">Phone</label>
+    <input type="tel" id="attorneyPhone" data-section="attorney" placeholder="Phone">
+  </div>
+  <div class="form-field">
+    <label for="attorneyEmail" class="field-label">Email</label>
+    <input type="email" id="attorneyEmail" data-section="attorney" placeholder="Email">
+  </div>
+</div>
+
+<div class="address-line">
+  <div class="form-field street">
+    <label for="attorneyStreet" class="field-label">Street Address</label>
+    <input type="text" id="attorneyStreet" data-section="attorney" placeholder="Street Address">
+  </div>
+  <div class="form-field city">
+    <label for="attorneyCity" class="field-label">City</label>
+    <input type="text" id="attorneyCity" data-section="attorney" placeholder="City">
+  </div>
+  <div class="form-field state">
+    <label for="attorneyState" class="field-label">State</label>
+    <input type="text" id="attorneyState" data-section="attorney" list="stateList" value="CA" placeholder="State">
+  </div>
+  <div class="form-field zip">
+    <label for="attorneyZip" class="field-label">ZIP</label>
+    <input type="text" id="attorneyZip" data-section="attorney" placeholder="ZIP" maxlength="10">
+  </div>
+</div>
+</section>
+
+<h3 class="section-header">Employer Information</h3>
+<section class="form-section" id="employer-section">
+<div class="grid two-col">
+  <div class="form-field">
+    <label for="employerName" class="field-label">Employer Contact Name</label>
+    <input type="text" id="employerName" data-section="employer" placeholder="Employer Contact Name" list="employerNameList">
+    <datalist id="employerNameList"></datalist>
+  </div>
+  <div class="form-field">
+    <label for="employerCompany" class="field-label">Company</label>
+    <input type="text" id="employerCompany" data-section="employer" placeholder="Company" list="employerCompanyList">
+    <datalist id="employerCompanyList"></datalist>
+  </div>
+</div>
+
+<div class="grid three-col">
+  <div class="form-field">
+    <label for="employerTitle" class="field-label">Title</label>
+    <input type="text" id="employerTitle" data-section="employer" placeholder="Title" value="HR Manager">
+  </div>
+  <div class="form-field">
+    <label for="employerPhone" class="field-label">Phone</label>
+    <input type="tel" id="employerPhone" data-section="employer" placeholder="Phone">
+  </div>
+  <div class="form-field">
+    <label for="employerEmail" class="field-label">Email</label>
+    <input type="email" id="employerEmail" data-section="employer" placeholder="Email">
+  </div>
+</div>
+
+<div class="address-line">
+  <div class="form-field street">
+    <label for="employerStreet" class="field-label">Street Address</label>
+    <input type="text" id="employerStreet" data-section="employer" placeholder="Street Address">
+  </div>
+  <div class="form-field city">
+    <label for="employerCity" class="field-label">City</label>
+    <input type="text" id="employerCity" data-section="employer" placeholder="City">
+  </div>
+  <div class="form-field state">
+    <label for="employerState" class="field-label">State</label>
+    <input type="text" id="employerState" data-section="employer" list="stateList" value="CA" placeholder="State">
+  </div>
+  <div class="form-field zip">
+    <label for="employerZip" class="field-label">ZIP</label>
+    <input type="text" id="employerZip" data-section="employer" placeholder="ZIP" maxlength="10">
+  </div>
+</div>
+</section>
+
+<h3 class="section-header">Claimant Information</h3>
+<section class="form-section" id="claimant-section">
+<div class="grid two-col">
+  <div class="form-field">
+    <label for="claimantName" class="field-label">Claimant Name</label>
+    <input type="text" id="claimantName" data-section="claimant" placeholder="Claimant Name" list="claimantNameList">
+    <datalist id="claimantNameList"></datalist>
+  </div>
+  <div class="form-field">
+    <label for="claimantJobTitle" class="field-label">Job Title</label>
+    <input type="text" id="claimantJobTitle" data-section="claimant" placeholder="Job Title">
+  </div>
+</div>
+
+<div class="grid two-col">
+  <div class="form-field">
+    <label for="claimantPhone" class="field-label">Phone</label>
+    <input type="tel" id="claimantPhone" data-section="claimant" placeholder="Phone">
+  </div>
+  <div class="form-field">
+    <label for="claimantEmail" class="field-label">Email</label>
+    <input type="email" id="claimantEmail" data-section="claimant" placeholder="Email">
+  </div>
+</div>
+
+<div class="grid two-col">
+  <div class="form-field">
+    <label for="claimantSSN" class="field-label">SSN</label>
+    <input type="text" id="claimantSSN" data-section="claimant" placeholder="SSN" maxlength="11">
+  </div>
+  <div class="form-field">
+    <label for="claimantDOB" class="field-label">Date of Birth</label>
+    <input type="date" id="claimantDOB" data-section="claimant">
+  </div>
+</div>
+
+<div class="address-line">
+  <div class="form-field street">
+    <label for="claimantStreet" class="field-label">Street Address</label>
+    <input type="text" id="claimantStreet" data-section="claimant" placeholder="Street Address">
+  </div>
+  <div class="form-field city">
+    <label for="claimantCity" class="field-label">City</label>
+    <input type="text" id="claimantCity" data-section="claimant" placeholder="City">
+  </div>
+  <div class="form-field state">
+    <label for="claimantState" class="field-label">State</label>
+    <input type="text" id="claimantState" data-section="claimant" list="stateList" value="CA" placeholder="State">
+  </div>
+  <div class="form-field zip">
+    <label for="claimantZip" class="field-label">ZIP</label>
+    <input type="text" id="claimantZip" data-section="claimant" placeholder="ZIP" maxlength="10">
+  </div>
+</div>
+</section>
+
+<h3 class="section-header">Case Information</h3>
+<section class="form-section" id="case-section">
+<div class="form-field">
+  <label for="caseClaimantStatement" class="field-label">Claimant Statement</label>
+  <textarea id="caseClaimantStatement" data-section="case" placeholder="Summary of claimant's statement"></textarea>
+</div>
+
+<div class="form-field">
+  <label for="caseClaimantWorking" class="field-label">Is Claimant Currently Working?</label>
+  <select id="caseClaimantWorking" data-section="case">
+    <option value="">Select...</option>
+    <option value="Yes">Yes</option>
+    <option value="No">No</option>
+    <option value="Modified Duty">Modified Duty</option>
+  </select>
+</div>
+
+<div class="form-field">
+  <label for="caseMedicalRelease" class="field-label">Medical Release/Limitations</label>
+  <textarea id="caseMedicalRelease" data-section="case" placeholder="Details of medical release and any limitations"></textarea>
+</div>
+
+<div class="form-field">
+  <label for="caseRestrictions" class="field-label">Work Restrictions</label>
+  <textarea id="caseRestrictions" data-section="case" placeholder="Specific work restrictions"></textarea>
+</div>
+
+<div class="form-field">
+  <label for="caseInjuryDescription" class="field-label">Injury Description</label>
+  <textarea id="caseInjuryDescription" data-section="case" placeholder="Detailed description of the injury"></textarea>
+</div>
+
+<div class="form-field">
+  <label for="caseAdjusterInstructions" class="field-label">Adjuster Instructions</label>
+  <textarea id="caseAdjusterInstructions" data-section="case" placeholder="Any specific instructions from the adjuster"></textarea>
+</div>
+</section>
+</form>
+
+<div class="button-container">
+  <button type="button" class="btn" id="save-btn">Save</button>
+  <button type="button" class="btn btn-secondary" id="sync-btn" disabled>Sync to Sheets</button>
+</div>
+
+<div id="sync-status" class="sync-status"></div>
+
+<div class="quick-links">
+  <strong>Next:</strong>
+  <a href="schedule-interview.html">Schedule Interview</a> |
+  <a href="update.html">Update</a> |
+  <a href="report-submission.html">Report Submission</a> |
+  <a href="billing.html">Billing</a> |
+  <a href="dashboard.html">Dashboard</a>
+</div>
+</section>
+</main>
+
+<footer class="site-footer">
+  <div class="version-stamp">RDB Case Management v1.0</div>
+</footer>
+
+<script src="intake-logic.js"></script>
+</body>
+</html>

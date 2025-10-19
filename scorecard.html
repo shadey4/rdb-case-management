@@ -1,0 +1,1428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scorecard - RDB Case Management</title>
+<link rel="stylesheet" href="charcoal.css">
+<style>
+/* Additional scorecard-specific styles */
+.scorecard-container {
+max-width: 1400px;
+margin: 0 auto;
+padding: 2rem;
+}
+.week-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  background: var(--charcoal-panel);
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-dark);
+}
+
+.week-display {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.week-nav {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.week-nav button {
+  padding: 0.5rem 1rem;
+  background: var(--accent);
+  color: var(--text-primary);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.week-nav button:hover:not(:disabled) {
+  background: var(--hover);
+  box-shadow: 0 0 8px var(--hover);
+}
+
+.week-nav button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.scorecard-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--charcoal-panel);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+}
+
+.scorecard-table thead {
+  background: var(--accent);
+}
+
+.scorecard-table th {
+  padding: 1rem;
+  text-align: center;
+  font-weight: 600;
+  color: var(--text-primary);
+  border: 1px solid var(--border-dark);
+}
+
+.scorecard-table th:first-child {
+  width: 50px;
+}
+
+.scorecard-table th:nth-child(2) {
+  text-align: left;
+  width: 250px;
+}
+
+.scorecard-table td {
+  padding: 0.75rem;
+  text-align: center;
+  border: 1px solid var(--border-dark);
+  color: var(--text-primary);
+}
+
+.scorecard-table td:nth-child(2) {
+  text-align: left;
+  font-weight: 500;
+}
+
+.scorecard-table tbody tr:hover {
+  background: rgba(57, 73, 171, 0.1);
+}
+
+.scorecard-table .total-col {
+  background: rgba(57, 73, 171, 0.2);
+  font-weight: 600;
+}
+
+.future-day {
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+.goal-tracker {
+  margin-top: 2rem;
+  background: var(--charcoal-panel);
+  padding: 1.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-dark);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.goal-item {
+  text-align: center;
+}
+
+.goal-label {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.goal-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.goal-progress {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.progress-bar {
+  width: 300px;
+  height: 30px;
+  background: var(--charcoal-bg);
+  border-radius: 15px;
+  overflow: hidden;
+  border: 1px solid var(--border-dark);
+}
+
+.progress-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.progress-green { background: var(--success); }
+.progress-yellow { background: var(--warning); }
+.progress-red { background: var(--danger); }
+</style>
+</head>
+<body>
+<header class="site-header">
+<div class="site-title">Scorecard</div>
+<nav class="site-nav">
+<div class="menu-group">
+<button class="btn btn-primary" onclick="location.href='dashboard.html'">Dashboard</button>
+<div class="dropdown">
+<button class="btn">Forms ▾</button>
+<div class="dropdown-menu">
+<a href="intake.html">Intake</a>
+<a href="schedule-interview.html">Schedule Interview</a>
+<a href="update.html">Update</a>
+<a href="report-submission.html">Report Submission</a>
+<a href="billing.html">Billing</a>
+</div>
+</div>
+<div class="dropdown">
+<button class="btn">Reports ▾</button>
+<div class="dropdown-menu">
+<a href="scorecard.html">Scorecard</a>
+<a href="pipeline.html">Pipeline</a>
+</div>
+</div>
+</div>
+</nav>
+</header>
+<main class="scorecard-container">
+<h1 class="form-title">Weekly Scorecard</h1>
+<div class="week-controls">
+  <div class="week-display" id="week-display">Week of Oct 6-12, 2025</div>
+  <div class="week-nav">
+    <button id="prev-week" onclick="navigateWeek(-1)">◄ Previous</button>
+    <button id="today-btn" onclick="navigateWeek(0)">Today</button>
+    <button id="next-week" onclick="navigateWeek(1)">Next ►</button>
+  </div>
+</div>
+
+<table class="scorecard-table">
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Metric</th>
+      <th id="header-d0">Mon</th>
+      <th id="header-d1">Tue</th>
+      <th id="header-d2">Wed</th>
+      <th id="header-d3">Thu</th>
+      <th id="header-d4">Fri</th>
+      <th>Total</th>
+    </tr>
+  </thead>
+  <tbody id="scorecard-body">
+    <tr>
+      <td>1</td>
+      <td>New Cases</td>
+      <td id="m1-d0">-</td>
+      <td id="m1-d1">-</td>
+      <td id="m1-d2">-</td>
+      <td id="m1-d3">-</td>
+      <td id="m1-d4">-</td>
+      <td class="total-col" id="m1-total">0</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>Scheduled Cases</td>
+      <td id="m2-d0">-</td>
+      <td id="m2-d1">-</td>
+      <td id="m2-d2">-</td>
+      <td id="m2-d3">-</td>
+      <td id="m2-d4">-</td>
+      <td class="total-col" id="m2-total">0</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>Investigator Completed</td>
+      <td id="m3-d0">-</td>
+      <td id="m3-d1">-</td>
+      <td id="m3-d2">-</td>
+      <td id="m3-d3">-</td>
+      <td id="m3-d4">-</td>
+      <td class="total-col" id="m3-total">0</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>Average Turnaround (days)</td>
+      <td id="m4-d0">-</td>
+      <td id="m4-d1">-</td>
+      <td id="m4-d2">-</td>
+      <td id="m4-d3">-</td>
+      <td id="m4-d4">-</td>
+      <td class="total-col" id="m4-total">-</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>Cases Billed</td>
+      <td id="m5-d0">-</td>
+      <td id="m5-d1">-</td>
+      <td id="m5-d2">-</td>
+      <td id="m5-d3">-</td>
+      <td id="m5-d4">-</td>
+      <td class="total-col" id="m5-total">0</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>Total Billed ($)</td>
+      <td id="m6-d0">-</td>
+      <td id="m6-d1">-</td>
+      <td id="m6-d2">-</td>
+      <td id="m6-d3">-</td>
+      <td id="m6-d4">-</td>
+      <td class="total-col" id="m6-total">$0.00</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="goal-tracker">
+  <div class="goal-item">
+    <div class="goal-label">Weekly Goal</div>
+    <div class="goal-value">$12,000</div>
+  </div>
+  <div class="goal-progress">
+    <div class="progress-bar">
+      <div class="progress-fill" id="progress-fill">0%</div>
+    </div>
+  </div>
+  <div class="goal-item">
+    <div class="goal-label">Current</div>
+    <div class="goal-value" id="current-total">$0.00</div>
+  </div>
+</div>
+</main>
+<footer class="site-footer">
+<div class="version-stamp">RDB Case Management v1.3</div>
+<div class="quick-links">
+<strong>Next:</strong>
+<a href="dashboard.html">Dashboard</a> |
+<a href="pipeline.html">Pipeline</a> |
+<a href="billing.html">Billing</a> |
+<a href="report-submission.html">Report Submission</a>
+</div>
+</footer>
+<script>
+// Current week boundaries (Monday-Friday only)
+let currentWeekStart = null;
+const today = new Date();
+today.setHours(0, 0, 0, 0);
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+navigateWeek(0); // Load current week
+});
+
+// Get week boundaries (Monday to Friday)
+function getWeekBoundaries(date) {
+const d = new Date(date);
+const dayOfWeek = d.getDay(); // 0=Sunday, 1=Monday, etc.
+
+// Find Monday of the week
+let daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // If Sunday, go back 6 days
+const weekStart = new Date(d);
+weekStart.setDate(d.getDate() - daysFromMonday);
+weekStart.setHours(0, 0, 0, 0);
+
+// Friday is 4 days after Monday
+const weekEnd = new Date(weekStart);
+weekEnd.setDate(weekStart.getDate() + 4);
+weekEnd.setHours(23, 59, 59, 999);
+
+return { start: weekStart, end: weekEnd };
+}
+
+// Navigate weeks
+function navigateWeek(direction) {
+if (direction === 0) {
+// Today button - jump to current week
+const bounds = getWeekBoundaries(today);
+currentWeekStart = bounds.start;
+} else if (currentWeekStart === null) {
+// First load
+const bounds = getWeekBoundaries(today);
+currentWeekStart = bounds.start;
+} else {
+// Previous/Next - move by 7 days to get to next Monday
+currentWeekStart = new Date(currentWeekStart);
+currentWeekStart.setDate(currentWeekStart.getDate() + (direction * 7));
+}
+
+updateWeekDisplay();
+calculateMetrics();
+updateNavigationButtons();
+}
+
+// Update week display text and date headers
+function updateWeekDisplay() {
+const weekEnd = new Date(currentWeekStart);
+weekEnd.setDate(currentWeekStart.getDate() + 4); // Friday
+
+const startStr = formatDate(currentWeekStart);
+const endStr = formatDate(weekEnd);
+
+document.getElementById('week-display').textContent =
+`Week of ${startStr} - ${endStr}`;
+
+// Update day headers with actual dates (Mon-Fri only)
+for (let i = 0; i < 5; i++) {
+const dayDate = new Date(currentWeekStart);
+dayDate.setDate(currentWeekStart.getDate() + i);
+const dateStr = (dayDate.getMonth() + 1) + '/' + dayDate.getDate();
+document.getElementById(`header-d${i}`).textContent = dateStr;
+}
+}
+
+// Format date as "Oct 6, 2025"
+function formatDate(date) {
+const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+return `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+}
+
+// Update navigation button states
+function updateNavigationButtons() {
+const nextWeekStart = new Date(currentWeekStart);
+nextWeekStart.setDate(currentWeekStart.getDate() + 7);
+
+// Disable next button if next week is in future
+document.getElementById('next-week').disabled = nextWeekStart > today;
+}
+
+// Check if date matches a specific day in current week (Mon-Fri only)
+function matchesDay(dateStr, dayOffset) {
+if (!dateStr) return false;
+const checkDate = new Date(dateStr);
+checkDate.setHours(0, 0, 0, 0);
+
+const targetDate = new Date(currentWeekStart);
+targetDate.setDate(currentWeekStart.getDate() + dayOffset);
+targetDate.setHours(0, 0, 0, 0);
+
+return checkDate.getTime() === targetDate.getTime();
+}
+
+// Check if date is in the future
+function isFutureDay(dayOffset) {
+const checkDate = new Date(currentWeekStart);
+checkDate.setDate(currentWeekStart.getDate() + dayOffset);
+return checkDate > today;
+}
+
+// Format currency
+function formatCurrency(amount) {
+if (amount >= 1000) {
+return '$' + (amount / 1000).toFixed(1) + 'K';
+}
+return '$' + amount.toFixed(2);
+}
+
+// Calculate all metrics
+function calculateMetrics() {
+// Initialize data structures for each day (Mon-Fri only = 5 days)
+const metrics = {
+newCases: [0, 0, 0, 0, 0],
+scheduled: [0, 0, 0, 0, 0],
+completed: [0, 0, 0, 0, 0],
+turnaroundDays: [[], [], [], [], []],
+billed: [0, 0, 0, 0, 0],
+billedAmount: [0, 0, 0, 0, 0]
+};
+
+// Track which cases have had first interview scheduled
+const firstInterviewScheduled = new Set();
+
+// Read all localStorage data
+for (let i = 0; i < localStorage.length; i++) {
+const key = localStorage.key(i);
+try {
+const data = JSON.parse(localStorage.getItem(key));
+
+// Metric 1: New Cases
+if (key.startsWith('case_')) {
+for (let day = 0; day < 5; day++) {
+if (matchesDay(data.assignmentDate, day)) {
+metrics.newCases[day]++;
+}
+}
+}
+
+// Metric 2: Scheduled Cases (first interviews only)
+if (key.startsWith('interview_')) {
+const caseKey = data.caseKey;
+if (!firstInterviewScheduled.has(caseKey)) {
+for (let day = 0; day < 5; day++) {
+if (matchesDay(data.dateCreated, day)) {
+metrics.scheduled[day]++;
+firstInterviewScheduled.add(caseKey);
+break;
+}
+}
+}
+}
+
+// Metric 3 & 4: Investigator Completed and Turnaround
+if (key.startsWith('reportSubmission_')) {
+for (let day = 0; day < 5; day++) {
+if (matchesDay(data.submissionDate, day)) {
+metrics.completed[day]++;
+
+// Calculate turnaround time
+const caseKey = data.caseKey;
+const caseData = JSON.parse(localStorage.getItem(caseKey) || '{}');
+if (caseData.assignmentDate) {
+const dateOpened = new Date(caseData.assignmentDate);
+const dateCompleted = new Date(data.submissionDate);
+const daysDiff = Math.round((dateCompleted - dateOpened) / (1000 * 60 * 60 * 24));
+metrics.turnaroundDays[day].push(daysDiff);
+}
+}
+}
+}
+
+// Metric 5 & 6: Cases Billed and Total Billed
+if (key.startsWith('billing_')) {
+for (let day = 0; day < 5; day++) {
+if (matchesDay(data.billingDate, day)) {
+metrics.billed[day]++;
+metrics.billedAmount[day] += parseFloat(data.billingAmount || 0);
+}
+}
+}
+} catch (e) {
+console.error('Error parsing localStorage item:', key, e);
+}
+}
+
+// Update table cells (Mon-Fri only = 5 days)
+for (let day = 0; day < 5; day++) {
+const isFuture = isFutureDay(day);
+
+// Metric 1: New Cases
+const m1Cell = document.getElementById(`m1-d${day}`);
+m1Cell.textContent = isFuture ? '-' : metrics.newCases[day];
+m1Cell.className = isFuture ? 'future-day' : '';
+
+// Metric 2: Scheduled Cases
+const m2Cell = document.getElementById(`m2-d${day}`);
+m2Cell.textContent = isFuture ? '-' : metrics.scheduled[day];
+m2Cell.className = isFuture ? 'future-day' : '';
+
+// Metric 3: Investigator Completed
+const m3Cell = document.getElementById(`m3-d${day}`);
+m3Cell.textContent = isFuture ? '-' : metrics.completed[day];
+m3Cell.className = isFuture ? 'future-day' : '';
+
+// Metric 4: Average Turnaround
+const m4Cell = document.getElementById(`m4-d${day}`);
+if (isFuture) {
+m4Cell.textContent = '-';
+m4Cell.className = 'future-day';
+} else if (metrics.turnaroundDays[day].length > 0) {
+const avg = metrics.turnaroundDays[day].reduce((a, b) => a + b, 0) / metrics.turnaroundDays[day].length;
+m4Cell.textContent = Math.round(avg);
+m4Cell.className = '';
+} else {
+m4Cell.textContent = '-';
+m4Cell.className = '';
+}
+
+// Metric 5: Cases Billed
+const m5Cell = document.getElementById(`m5-d${day}`);
+m5Cell.textContent = isFuture ? '-' : metrics.billed[day];
+m5Cell.className = isFuture ? 'future-day' : '';
+
+// Metric 6: Total Billed
+const m6Cell = document.getElementById(`m6-d${day}`);
+if (isFuture) {
+m6Cell.textContent = '-';
+m6Cell.className = 'future-day';
+} else {
+m6Cell.textContent = formatCurrency(metrics.billedAmount[day]);
+m6Cell.className = '';
+}
+}
+
+// Calculate totals (only sum non-future days)
+let totalNewCases = 0;
+let totalScheduled = 0;
+let totalCompleted = 0;
+let totalBilled = 0;
+let totalBilledAmount = 0;
+
+for (let day = 0; day < 5; day++) {
+if (!isFutureDay(day)) {
+totalNewCases += metrics.newCases[day];
+totalScheduled += metrics.scheduled[day];
+totalCompleted += metrics.completed[day];
+totalBilled += metrics.billed[day];
+totalBilledAmount += metrics.billedAmount[day];
+}
+}
+
+// Calculate average turnaround for week (only non-future days)
+let allTurnaroundDays = [];
+for (let day = 0; day < 5; day++) {
+if (!isFutureDay(day)) {
+allTurnaroundDays = allTurnaroundDays.concat(metrics.turnaroundDays[day]);
+}
+}
+
+let avgTurnaround = '-';
+if (allTurnaroundDays.length > 0) {
+const weekAvg = allTurnaroundDays.reduce((a, b) => a + b, 0) / allTurnaroundDays.length;
+avgTurnaround = Math.round(weekAvg);
+}
+
+// Update total cells
+document.getElementById('m1-total').textContent = totalNewCases;
+document.getElementById('m2-total').textContent = totalScheduled;
+document.getElementById('m3-total').textContent = totalCompleted;
+document.getElementById('m4-total').textContent = avgTurnaround;
+document.getElementById('m5-total').textContent = totalBilled;
+document.getElementById('m6-total').textContent = formatCurrency(totalBilledAmount);
+
+// Update goal tracker
+updateGoalTracker(totalBilledAmount);
+}
+
+// Update weekly goal tracker
+function updateGoalTracker(currentAmount) {
+const weeklyGoal = 12000;
+const percentage = Math.min((currentAmount / weeklyGoal) * 100, 100);
+
+// Update current total display
+document.getElementById('current-total').textContent = formatCurrency(currentAmount);
+
+// Update progress bar
+const progressFill = document.getElementById('progress-fill');
+progressFill.style.width = percentage + '%';
+progressFill.textContent = Math.round(percentage) + '%';
+
+// Color coding
+progressFill.className = 'progress-fill';
+if (percentage >= 100) {
+progressFill.classList.add('progress-green');
+} else if (percentage >= 70) {
+progressFill.classList.add('progress-yellow');
+} else {
+progressFill.classList.add('progress-red');
+}
+}
+</script>
+</body>
+</html>
+--- START OF FILE intake.html ---
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Intake Form</title>
+<link rel="stylesheet" href="charcoal.css">
+</head>
+<body>
+<header class="site-header">
+<div class="site-title">Intake Form</div>
+<nav class="site-nav">
+<div class="menu-group">
+<button class="btn btn-primary" onclick="location.href='dashboard.html'">Dashboard</button>
+<div class="dropdown">
+<button class="btn">Forms ▾</button>
+<div class="dropdown-menu">
+<a href="intake.html">Intake</a>
+<a href="schedule-interview.html">Schedule Interview</a>
+<a href="update.html">Update</a>
+<a href="report-submission.html">Report Submission</a>
+<a href="billing.html">Billing</a>
+</div>
+</div>
+<div class="dropdown">
+<button class="btn">Reports ▾</button>
+<div class="dropdown-menu">
+<a href="scorecard.html">Scorecard</a>
+<a href="pipeline.html">Pipeline</a>
+</div>
+</div>
+</div>
+</nav>
+</header>
+<main class="content">
+<section class="form-container" id="intake-form">
+<h1 class="form-title">Intake Form</h1>
+<h3 class="section-header">Assignment</h3>
+<section class="form-section" id="assignment-section">
+<div class="grid three-col">
+<div class="form-field">
+<label for="claim-number" class="field-label">Claim Number</label>
+<input type="text" id="claim-number" autocomplete="off" placeholder="Enter Claim Number">
+</div>
+<div class="form-field">
+<label for="injury-date" class="field-label">Date of Injury</label>
+<input type="date" id="injury-date">
+</div>
+<div class="form-field">
+<label for="service" class="field-label">Service</label>
+<select id="service">
+<option value="AOE/COE">AOE/COE</option>
+<option value="Liability">Liability</option>
+<option value="Surveillance">Surveillance</option>
+<option value="Ergo">Ergo</option>
+<option value="Police Report">Police Report</option>
+<option value="Records Request">Records Request</option>
+</select>
+</div>
+</div>
+<div class="grid three-col">
+  <div class="form-field">
+    <label for="assignment-date" class="field-label">Date of Assignment</label>
+    <input type="date" id="assignment-date">
+  </div>
+  <div class="form-field">
+    <label for="due-date" class="field-label">Due Date</label>
+    <input type="date" id="due-date">
+  </div>
+  <div class="form-field">
+    <label for="decision-date" class="field-label">Decision Date</label>
+    <input type="date" id="decision-date">
+  </div>
+</div>
+
+<div class="grid three-col">
+  <div class="form-field">
+    <label for="status" class="field-label">Status</label>
+    <select id="status">
+      <option value="Open">Open</option>
+      <option value="Closed">Closed</option>
+      <option value="On Hold">On Hold</option>
+    </select>
+  </div>
+  <div class="form-field">
+    <label for="investigator" class="field-label">Investigator</label>
+    <select id="investigator"></select>
+  </div>
+  <div class="form-field">
+    <label for="pipeline-stage" class="field-label">Pipeline Stage</label>
+    <input type="text" id="pipeline-stage" placeholder="Enter Pipeline Stage">
+  </div>
+</div>
+</section>
+<h3 class="section-header">Client Information</h3>
+<section class="form-section" id="client-section">
+<div class="grid four-col">
+<div class="form-field">
+<input type="text" id="adjuster-name" placeholder="Adjuster Name" list="adjuster-history">
+<datalist id="adjuster-history"></datalist>
+</div>
+<div class="form-field">
+<input type="text" id="company-name" placeholder="Company" list="client-history">
+<datalist id="client-history"></datalist>
+</div>
+</div>
+<div class="grid four-col">
+<div class="form-field"><input type="text" id="adjuster-title" placeholder="Title"></div>
+<div class="form-field"><input type="tel" id="adjuster-phone" placeholder="Phone"></div>
+<div class="form-field"><input type="email" id="adjuster-email" placeholder="Email (optional)"></div>
+</div>
+<div class="grid four-col">
+<div class="form-field"><input type="text" id="adjuster-street" placeholder="Street Address"></div>
+<div class="form-field"><input type="text" id="adjuster-city" placeholder="City"></div>
+<div class="form-field">
+<input type="text" id="adjuster-state" list="States" value="CA" placeholder="State">
+<datalist id="States">
+<option value="CA">
+<option value="NY">
+<option value="TX">
+<option value="FL">
+</datalist>
+</div>
+<div class="form-field"><input type="text" id="adjuster-zip" placeholder="ZIP" maxlength="10"></div>
+</div>
+</section>
+<h3 class="section-header">Attorney Information</h3>
+<section class="form-section" id="attorney-section">
+<div class="grid four-col">
+<div class="form-field">
+<input type="text" id="attorney-name" placeholder="Attorney" list="attorney-history">
+<datalist id="attorney-history"></datalist>
+</div>
+<div class="form-field">
+<input type="text" id="attorney-company" placeholder="Company" list="attorney-company-history">
+<datalist id="attorney-company-history"></datalist>
+</div>
+</div>
+<div class="grid four-col">
+<div class="form-field">
+<input type="text" id="attorney-title" list="AttorneyTitles" placeholder="Title – Type to add" value="Attorney">
+<datalist id="AttorneyTitles">
+<option value="Attorney">
+<option value="Partner">
+<option value="Managing Attorney">
+<option value="Managing Partner">
+<option value="Owner">
+</datalist>
+</div>
+<div class="form-field"><input type="tel" id="attorney-phone" placeholder="Phone"></div>
+<div class="form-field"><input type="email" id="attorney-email" placeholder="Email (optional)"></div>
+</div>
+<div class="grid four-col">
+<div class="form-field"><input type="text" id="attorney-street" placeholder="Street Address"></div>
+<div class="form-field"><input type="text" id="attorney-city" placeholder="City"></div>
+<div class="form-field">
+<input type="text" id="attorney-state" list="States" value="CA" placeholder="State">
+</div>
+<div class="form-field"><input type="text" id="attorney-zip" placeholder="ZIP" maxlength="10"></div>
+</div>
+</section>
+<h3 class="section-header">Employer Information</h3>
+<section class="form-section" id="employer-section">
+<div class="grid three-col">
+<div class="form-field">
+<input type="text" id="employer-contact" placeholder="Contact Name" list="employer-contact-history">
+<datalist id="employer-contact-history"></datalist>
+</div>
+<div class="form-field">
+<input type="text" id="employer-company" placeholder="Company" list="employer-company-history">
+<datalist id="employer-company-history"></datalist>
+</div>
+</div>
+<div class="grid three-col">
+<div class="form-field"><input type="text" id="employer-title" placeholder="Title"></div>
+<div class="form-field"><input type="tel" id="employer-phone" placeholder="Phone"></div>
+<div class="form-field"><input type="email" id="employer-email" placeholder="Email (optional)"></div>
+</div>
+<div class="grid four-col">
+<div class="form-field"><input type="text" id="employer-street" placeholder="Street Address"></div>
+<div class="form-field"><input type="text" id="employer-city" placeholder="City"></div>
+<div class="form-field">
+<input type="text" id="employer-state" list="States" value="CA" placeholder="State">
+</div>
+<div class="form-field"><input type="text" id="employer-zip" placeholder="ZIP" maxlength="10"></div>
+</div>
+</section>
+<h3 class="section-header">Claimant Information</h3>
+<section class="form-section" id="claimant-section">
+<div class="grid two-col">
+<div class="form-field"><input type="text" id="claimant-name" placeholder="Claimant Name"></div>
+<div class="form-field"><input type="text" id="claimant-title" placeholder="Job Title"></div>
+</div>
+<div class="grid two-col">
+<div class="form-field"><input type="tel" id="claimant-phone" placeholder="Phone"></div>
+<div class="form-field"><input type="email" id="claimant-email" placeholder="Email (optional)"></div>
+</div>
+<div class="grid two-col">
+<div class="form-field">
+<label for="claimant-ssn" class="field-label">SSN</label>
+<input type="text" id="claimant-ssn" placeholder="###-##-####" value="###-##-####" oninput="formatSSN(this)">
+</div>
+<div class="form-field">
+<label for="claimant-dob" class="field-label">Date of Birth</label>
+<input type="date" id="claimant-dob">
+</div>
+</div>
+<div class="grid four-col">
+<div class="form-field"><input type="text" id="claimant-street" placeholder="Street Address"></div>
+<div class="form-field"><input type="text" id="claimant-city" placeholder="City"></div>
+<div class="form-field">
+<input type="text" id="claimant-state" list="States" value="CA" placeholder="State">
+</div>
+<div class="form-field"><input type="text" id="claimant-zip" placeholder="ZIP" maxlength="10"></div>
+</div>
+</section>
+<h3 class="section-header">Case Information</h3>
+<section class="form-section" id="case-section">
+<div class="grid three-col">
+<div class="form-field">
+<label for="claimant-statement" class="field-label">Claimant Statement?</label>
+<select id="claimant-statement">
+<option value="Yes">Yes</option>
+<option value="No">No</option>
+</select>
+</div>
+<div class="form-field">
+<label for="claimant-working" class="field-label">Claimant Working?</label>
+<select id="claimant-working">
+<option value="Not specified" selected>Not specified</option>
+<option value="Yes">Yes</option>
+<option value="No">No</option>
+</select>
+</div>
+<div class="form-field">
+<label for="medical-release" class="field-label">Obtain Medical Release?</label>
+<select id="medical-release">
+<option value="Yes">Yes</option>
+<option value="No">No</option>
+</select>
+</div>
+</div>
+<div class="form-field">
+  <label for="restrictions" class="field-label">Restrictions</label>
+  <textarea id="restrictions" placeholder="Enter any claimant restrictions here" rows="4"></textarea>
+</div>
+
+<div class="form-field">
+  <label for="injury-description" class="field-label">Injury Description</label>
+  <textarea id="injury-description" placeholder="Injury Description" rows="3"></textarea>
+</div>
+
+<div class="form-field">
+  <label for="adjuster-instructions" class="field-label">Adjuster Instructions</label>
+  <textarea id="adjuster-instructions" placeholder="Adjuster Instructions" rows="3"></textarea>
+</div>
+</section>
+<div class="button-container">
+<button type="button" class="btn" id="save-btn" onclick="saveIntake()">Save</button>
+<button type="button" class="btn btn-secondary" id="sync-btn" onclick="syncToSheets()" disabled>Sync to Sheets</button>
+</div>
+<div id="sync-status" class="sync-status"></div>
+<div class="quick-links">
+<strong>Next:</strong>
+<a href="schedule-interview.html">Schedule Interview</a> |
+<a href="update.html">Update</a> |
+<a href="report-submission.html">Report Submission</a> |
+<a href="billing.html">Billing</a> |
+<a href="dashboard.html">Dashboard</a>
+</div>
+</section>
+</main>
+<footer class="site-footer">
+<div class="version-stamp">RDB Case Management v1.0</div>
+</footer>
+<script>
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzp7EWEWddYYqQMfBRcA2eriHkbbvCllS-9IOo-panx2Ve04oJThBxUINCuSN_7DwEzFg/exec';
+let lastSavedCaseKey = null;
+window.addEventListener('DOMContentLoaded', initializeForm);
+function initializeForm() {
+loadDatalists();
+setupInvestigatorDropdown();
+setupAutofillListeners();
+}
+function loadDatalists() {
+const adjusterDatalist = document.getElementById('adjuster-history');
+const clientDatalist = document.getElementById('client-history');
+const attorneyDatalist = document.getElementById('attorney-history');
+const attorneyCompanyDatalist = document.getElementById('attorney-company-history');
+const employerContactDatalist = document.getElementById('employer-contact-history');
+const employerCompanyDatalist = document.getElementById('employer-company-history');
+adjusterDatalist.innerHTML = '';
+clientDatalist.innerHTML = '';
+attorneyDatalist.innerHTML = '';
+attorneyCompanyDatalist.innerHTML = '';
+employerContactDatalist.innerHTML = '';
+employerCompanyDatalist.innerHTML = '';
+const recentAdjusters = JSON.parse(localStorage.getItem('recentAdjusters') || '[]');
+recentAdjusters.forEach(adj => {
+const opt = document.createElement('option');
+opt.value = adj;
+adjusterDatalist.appendChild(opt);
+});
+const recentClients = JSON.parse(localStorage.getItem('recentClients') || '[]');
+recentClients.forEach(client => {
+const opt = document.createElement('option');
+opt.value = client;
+clientDatalist.appendChild(opt);
+});
+const recentAttorneys = JSON.parse(localStorage.getItem('recentAttorneys') || '[]');
+recentAttorneys.forEach(att => {
+const opt = document.createElement('option');
+opt.value = att;
+attorneyDatalist.appendChild(opt);
+});
+const recentAttorneyCompanies = JSON.parse(localStorage.getItem('recentAttorneyCompanies') || '[]');
+recentAttorneyCompanies.forEach(comp => {
+const opt = document.createElement('option');
+opt.value = comp;
+attorneyCompanyDatalist.appendChild(opt);
+});
+const recentEmployerContacts = JSON.parse(localStorage.getItem('recentEmployerContacts') || '[]');
+recentEmployerContacts.forEach(contact => {
+const opt = document.createElement('option');
+opt.value = contact;
+employerContactDatalist.appendChild(opt);
+});
+const recentEmployerCompanies = JSON.parse(localStorage.getItem('recentEmployerCompanies') || '[]');
+recentEmployerCompanies.forEach(comp => {
+const opt = document.createElement('option');
+opt.value = comp;
+employerCompanyDatalist.appendChild(opt);
+});
+}
+function getAdjusterDetailsFromLocalStorage(adjusterName) {
+for (let i = 0; i < localStorage.length; i++) {
+const key = localStorage.key(i);
+if (key.startsWith('case_')) {
+const caseData = JSON.parse(localStorage.getItem(key));
+if (caseData.adjusterName === adjusterName) {
+return {
+clientCompany: caseData.clientCompany,
+title: caseData.adjusterTitle,
+phone: caseData.adjusterPhone,
+email: caseData.adjusterEmail,
+street: caseData.adjusterAddress?.street || '',
+city: caseData.adjusterAddress?.city || '',
+state: caseData.adjusterAddress?.state || 'CA',
+zip: caseData.adjusterAddress?.zip || ''
+};
+}
+}
+}
+return null;
+}
+function getCompanyDetailsFromLocalStorage(companyName) {
+for (let i = 0; i < localStorage.length; i++) {
+const key = localStorage.key(i);
+if (key.startsWith('case_')) {
+const caseData = JSON.parse(localStorage.getItem(key));
+if (caseData.clientCompany === companyName && caseData.adjusterName) {
+return {
+adjusterName: caseData.adjusterName,
+title: caseData.adjusterTitle,
+phone: caseData.adjusterPhone,
+email: caseData.adjusterEmail,
+street: caseData.adjusterAddress?.street || '',
+city: caseData.adjusterAddress?.city || '',
+state: caseData.adjusterAddress?.state || 'CA',
+zip: caseData.adjusterAddress?.zip || ''
+};
+}
+}
+}
+return null;
+}
+function getAttorneyDetailsFromLocalStorage(attorneyName) {
+for (let i = 0; i < localStorage.length; i++) {
+const key = localStorage.key(i);
+if (key.startsWith('case_')) {
+const caseData = JSON.parse(localStorage.getItem(key));
+if (caseData.attorneyName === attorneyName) {
+return {
+attorneyCompany: caseData.attorneyCompany,
+title: caseData.attorneyTitle,
+phone: caseData.attorneyPhone,
+email: caseData.attorneyEmail,
+street: caseData.attorneyAddress?.street || '',
+city: caseData.attorneyAddress?.city || '',
+state: caseData.attorneyAddress?.state || 'CA',
+zip: caseData.attorneyAddress?.zip || ''
+};
+}
+}
+}
+return null;
+}
+function getAttorneyCompanyDetailsFromLocalStorage(companyName) {
+for (let i = 0; i < localStorage.length; i++) {
+const key = localStorage.key(i);
+if (key.startsWith('case_')) {
+const caseData = JSON.parse(localStorage.getItem(key));
+if (caseData.attorneyCompany === companyName && caseData.attorneyName) {
+return {
+attorneyName: caseData.attorneyName,
+title: caseData.attorneyTitle,
+phone: caseData.attorneyPhone,
+email: caseData.attorneyEmail,
+street: caseData.attorneyAddress?.street || '',
+city: caseData.attorneyAddress?.city || '',
+state: caseData.attorneyAddress?.state || 'CA',
+zip: caseData.attorneyAddress?.zip || ''
+};
+}
+}
+}
+return null;
+}
+function getEmployerContactDetailsFromLocalStorage(contactName) {
+for (let i = 0; i < localStorage.length; i++) {
+const key = localStorage.key(i);
+if (key.startsWith('case_')) {
+const caseData = JSON.parse(localStorage.getItem(key));
+if (caseData.employerContact === contactName) {
+return {
+employerCompany: caseData.employerCompany,
+title: caseData.employerTitle,
+phone: caseData.employerPhone,
+email: caseData.employerEmail,
+street: caseData.employerAddress?.street || '',
+city: caseData.employerAddress?.city || '',
+state: caseData.employerAddress?.state || 'CA',
+zip: caseData.employerAddress?.zip || ''
+};
+}
+}
+}
+return null;
+}
+function getEmployerCompanyDetailsFromLocalStorage(companyName) {
+for (let i = 0; i < localStorage.length; i++) {
+const key = localStorage.key(i);
+if (key.startsWith('case_')) {
+const caseData = JSON.parse(localStorage.getItem(key));
+if (caseData.employerCompany === companyName && caseData.employerContact) {
+return {
+employerContact: caseData.employerContact,
+title: caseData.employerTitle,
+phone: caseData.employerPhone,
+email: caseData.employerEmail,
+street: caseData.employerAddress?.street || '',
+city: caseData.employerAddress?.city || '',
+state: caseData.employerAddress?.state || 'CA',
+zip: caseData.employerAddress?.zip || ''
+};
+}
+}
+}
+return null;
+}
+function handleAdjusterInput() {
+const adjusterName = document.getElementById('adjuster-name').value;
+const companyNameField = document.getElementById('company-name');
+// Clear related fields if the adjuster name is cleared or doesn't match a stored record
+companyNameField.value = '';
+document.getElementById('adjuster-title').value = '';
+document.getElementById('adjuster-phone').value = '';
+document.getElementById('adjuster-email').value = '';
+document.getElementById('adjuster-street').value = '';
+document.getElementById('adjuster-city').value = '';
+document.getElementById('adjuster-state').value = 'CA';
+document.getElementById('adjuster-zip').value = '';
+if (adjusterName) {
+const details = getAdjusterDetailsFromLocalStorage(adjusterName);
+if (details) {
+companyNameField.value = details.clientCompany || '';
+document.getElementById('adjuster-title').value = details.title || '';
+document.getElementById('adjuster-phone').value = details.phone || '';
+document.getElementById('adjuster-email').value = details.email || '';
+document.getElementById('adjuster-street').value = details.street || '';
+document.getElementById('adjuster-city').value = details.city || '';
+document.getElementById('adjuster-state').value = details.state || 'CA';
+document.getElementById('adjuster-zip').value = details.zip || '';
+}
+}
+}
+function handleCompanyInput() {
+const companyName = document.getElementById('company-name').value;
+const adjusterNameField = document.getElementById('adjuster-name');
+// Clear related fields if the company name is cleared or doesn't match a stored record
+adjusterNameField.value = '';
+document.getElementById('adjuster-title').value = '';
+document.getElementById('adjuster-phone').value = '';
+document.getElementById('adjuster-email').value = '';
+document.getElementById('adjuster-street').value = '';
+document.getElementById('adjuster-city').value = '';
+document.getElementById('adjuster-state').value = 'CA';
+document.getElementById('adjuster-zip').value = '';
+if (companyName) {
+const details = getCompanyDetailsFromLocalStorage(companyName);
+if (details) {
+adjusterNameField.value = details.adjusterName || '';
+document.getElementById('adjuster-title').value = details.title || '';
+document.getElementById('adjuster-phone').value = details.phone || '';
+document.getElementById('adjuster-email').value = details.email || '';
+document.getElementById('adjuster-street').value = details.street || '';
+document.getElementById('adjuster-city').value = details.city || '';
+document.getElementById('adjuster-state').value = details.state || 'CA';
+document.getElementById('adjuster-zip').value = details.zip || '';
+}
+}
+}
+function handleAttorneyInput() {
+const attorneyName = document.getElementById('attorney-name').value;
+const attorneyCompanyField = document.getElementById('attorney-company');
+attorneyCompanyField.value = '';
+document.getElementById('attorney-title').value = '';
+document.getElementById('attorney-phone').value = '';
+document.getElementById('attorney-email').value = '';
+document.getElementById('attorney-street').value = '';
+document.getElementById('attorney-city').value = '';
+document.getElementById('attorney-state').value = 'CA';
+document.getElementById('attorney-zip').value = '';
+if (attorneyName) {
+const details = getAttorneyDetailsFromLocalStorage(attorneyName);
+if (details) {
+attorneyCompanyField.value = details.attorneyCompany || '';
+document.getElementById('attorney-title').value = details.title || '';
+document.getElementById('attorney-phone').value = details.phone || '';
+document.getElementById('attorney-email').value = details.email || '';
+document.getElementById('attorney-street').value = details.street || '';
+document.getElementById('attorney-city').value = details.city || '';
+document.getElementById('attorney-state').value = details.state || 'CA';
+document.getElementById('attorney-zip').value = details.zip || '';
+}
+}
+}
+function handleAttorneyCompanyInput() {
+const attorneyCompany = document.getElementById('attorney-company').value;
+const attorneyNameField = document.getElementById('attorney-name');
+attorneyNameField.value = '';
+document.getElementById('attorney-title').value = '';
+document.getElementById('attorney-phone').value = '';
+document.getElementById('attorney-email').value = '';
+document.getElementById('attorney-street').value = '';
+document.getElementById('attorney-city').value = '';
+document.getElementById('attorney-state').value = 'CA';
+document.getElementById('attorney-zip').value = '';
+if (attorneyCompany) {
+const details = getAttorneyCompanyDetailsFromLocalStorage(attorneyCompany);
+if (details) {
+attorneyNameField.value = details.attorneyName || '';
+document.getElementById('attorney-title').value = details.title || '';
+document.getElementById('attorney-phone').value = details.phone || '';
+document.getElementById('attorney-email').value = details.email || '';
+document.getElementById('attorney-street').value = details.street || '';
+document.getElementById('attorney-city').value = details.city || '';
+document.getElementById('attorney-state').value = details.state || 'CA';
+document.getElementById('attorney-zip').value = details.zip || '';
+}
+}
+}
+function handleEmployerContactInput() {
+const employerContact = document.getElementById('employer-contact').value;
+const employerCompanyField = document.getElementById('employer-company');
+employerCompanyField.value = '';
+document.getElementById('employer-title').value = '';
+document.getElementById('employer-phone').value = '';
+document.getElementById('employer-email').value = '';
+document.getElementById('employer-street').value = '';
+document.getElementById('employer-city').value = '';
+document.getElementById('employer-state').value = 'CA';
+document.getElementById('employer-zip').value = '';
+if (employerContact) {
+const details = getEmployerContactDetailsFromLocalStorage(employerContact);
+if (details) {
+employerCompanyField.value = details.employerCompany || '';
+document.getElementById('employer-title').value = details.title || '';
+document.getElementById('employer-phone').value = details.phone || '';
+document.getElementById('employer-email').value = details.email || '';
+document.getElementById('employer-street').value = details.street || '';
+document.getElementById('employer-city').value = details.city || '';
+document.getElementById('employer-state').value = details.state || 'CA';
+document.getElementById('employer-zip').value = details.zip || '';
+}
+}
+}
+function handleEmployerCompanyInput() {
+const employerCompany = document.getElementById('employer-company').value;
+const employerContactField = document.getElementById('employer-contact');
+employerContactField.value = '';
+document.getElementById('employer-title').value = '';
+document.getElementById('employer-phone').value = '';
+document.getElementById('employer-email').value = '';
+document.getElementById('employer-street').value = '';
+document.getElementById('employer-city').value = '';
+document.getElementById('employer-state').value = 'CA';
+document.getElementById('employer-zip').value = '';
+if (employerCompany) {
+const details = getEmployerCompanyDetailsFromLocalStorage(employerCompany);
+if (details) {
+employerContactField.value = details.employerContact || '';
+document.getElementById('employer-title').value = details.title || '';
+document.getElementById('employer-phone').value = details.phone || '';
+document.getElementById('employer-email').value = details.email || '';
+document.getElementById('employer-street').value = details.street || '';
+document.getElementById('employer-city').value = details.city || '';
+document.getElementById('employer-state').value = details.state || 'CA';
+document.getElementById('employer-zip').value = details.zip || '';
+}
+}
+}
+function formatSSN(input) {
+let value = input.value.replace(/\D/g, ''); // Remove all non-numeric characters
+let formattedValue = '';
+if (value.length > 0) {
+formattedValue += value.substring(0, 3);
+}
+if (value.length > 3) {
+formattedValue += '-' + value.substring(3, 5);
+}
+if (value.length > 5) {
+formattedValue += '-' + value.substring(5, 9);
+}
+input.value = formattedValue;
+}
+function saveIntake() {
+const formData = {
+claimNumber: document.getElementById('claim-number').value,
+clientCompany: document.getElementById('company-name').value,
+adjusterName: document.getElementById('adjuster-name').value,
+adjusterTitle: document.getElementById('adjuster-title').value,
+adjusterPhone: document.getElementById('adjuster-phone').value,
+adjusterEmail: document.getElementById('adjuster-email').value,
+adjusterAddress: {
+street: document.getElementById('adjuster-street')?.value || '',
+city: document.getElementById('adjuster-city')?.value || '',
+state: document.getElementById('adjuster-state')?.value || '',
+zip: document.getElementById('adjuster-zip')?.value || ''
+},
+attorneyCompany: document.getElementById('attorney-company').value,
+attorneyName: document.getElementById('attorney-name').value,
+attorneyTitle: document.getElementById('attorney-title').value,
+attorneyPhone: document.getElementById('attorney-phone').value,
+attorneyEmail: document.getElementById('attorney-email').value,
+attorneyAddress: {
+street: document.getElementById('attorney-street')?.value || '',
+city: document.getElementById('attorney-city')?.value || '',
+state: document.getElementById('attorney-state')?.value || '',
+zip: document.getElementById('attorney-zip')?.value || ''
+},
+claimantName: document.getElementById('claimant-name').value,
+claimantTitle: document.getElementById('claimant-title').value,
+claimantPhone: document.getElementById('claimant-phone').value,
+claimantEmail: document.getElementById('claimant-email').value,
+claimantAddress: {
+street: document.getElementById('claimant-street')?.value || '',
+city: document.getElementById('claimant-city')?.value || '',
+state: document.getElementById('claimant-state')?.value || '',
+zip: document.getElementById('claimant-zip')?.value || ''
+},
+claimantSSN: document.getElementById('claimant-ssn')?.value || '',
+claimantDOB: document.getElementById('claimant-dob')?.value || '',
+employerCompany: document.getElementById('employer-company').value,
+employerContact: document.getElementById('employer-contact').value,
+employerTitle: document.getElementById('employer-title').value,
+employerPhone: document.getElementById('employer-phone').value,
+employerEmail: document.getElementById('employer-email').value,
+employerAddress: {
+street: document.getElementById('employer-street')?.value || '',
+city: document.getElementById('employer-city')?.value || '',
+state: document.getElementById('employer-state')?.value || '',
+zip: document.getElementById('employer-zip')?.value || ''
+},
+injuryDate: document.getElementById('injury-date').value,
+assignmentDate: document.getElementById('assignment-date').value,
+dueDate: document.getElementById('due-date').value,
+injuryDescription: document.getElementById('injury-description').value,
+adjusterInstructions: document.getElementById('adjuster-instructions').value,
+status: 'Open',
+dateCreated: new Date().toISOString()
+};
+const caseId = 'case_' + Date.now();
+localStorage.setItem(caseId, JSON.stringify(formData));
+lastSavedCaseKey = caseId;
+document.getElementById('sync-btn').disabled = false;
+document.getElementById('sync-status').innerHTML = '<span style="color: var(--warning);">⚠️ Not synced to Sheets yet</span>';
+alert('Intake saved to localStorage!\n\nClick "Sync to Sheets" to back up to Google Sheets.');
+let recentAdjusters = JSON.parse(localStorage.getItem('recentAdjusters') || '[]');
+let recentClients = JSON.parse(localStorage.getItem('recentClients') || '[]');
+let recentAttorneys = JSON.parse(localStorage.getItem('recentAttorneys') || '[]');
+let recentAttorneyCompanies = JSON.parse(localStorage.getItem('recentAttorneyCompanies') || '[]');
+let recentEmployerContacts = JSON.parse(localStorage.getItem('recentEmployerContacts') || '[]');
+let recentEmployerCompanies = JSON.parse(localStorage.getItem('recentEmployerCompanies') || '[]');
+const currentAdjuster = formData.adjusterName;
+const currentClient = formData.clientCompany;
+const currentAttorney = formData.attorneyName;
+const currentAttorneyCompany = formData.attorneyCompany;
+const currentEmployerContact = formData.employerContact;
+const currentEmployerCompany = formData.employerCompany;
+if (currentAdjuster && !recentAdjusters.includes(currentAdjuster)) {
+recentAdjusters.unshift(currentAdjuster);
+}
+if (currentClient && !recentClients.includes(currentClient)) {
+recentClients.unshift(currentClient);
+}
+if (currentAttorney && !recentAttorneys.includes(currentAttorney)) {
+recentAttorneys.unshift(currentAttorney);
+}
+if (currentAttorneyCompany && !recentAttorneyCompanies.includes(currentAttorneyCompany)) {
+recentAttorneyCompanies.unshift(currentAttorneyCompany);
+}
+if (currentEmployerContact && !recentEmployerContacts.includes(currentEmployerContact)) {
+recentEmployerContacts.unshift(currentEmployerContact);
+}
+if (currentEmployerCompany && !recentEmployerCompanies.includes(currentEmployerCompany)) {
+recentEmployerCompanies.unshift(currentEmployerCompany);
+}
+localStorage.setItem('recentAdjusters', JSON.stringify(recentAdjusters.slice(0, 10)));
+localStorage.setItem('recentClients', JSON.stringify(recentClients.slice(0, 10)));
+localStorage.setItem('recentAttorneys', JSON.stringify(recentAttorneys.slice(0, 10)));
+localStorage.setItem('recentAttorneyCompanies', JSON.stringify(recentAttorneyCompanies.slice(0, 10)));
+localStorage.setItem('recentEmployerContacts', JSON.stringify(recentEmployerContacts.slice(0, 10)));
+localStorage.setItem('recentEmployerCompanies', JSON.stringify(recentEmployerCompanies.slice(0, 10)));
+loadDatalists(); // Reload datalists to show newly added items
+}
+async function syncToSheets() {
+if (!lastSavedCaseKey) {
+alert('Please save the form first before syncing.');
+return;
+}
+const syncBtn = document.getElementById('sync-btn');
+const syncStatus = document.getElementById('sync-status');
+syncBtn.disabled = true;
+syncBtn.textContent = 'Syncing...';
+syncStatus.innerHTML = '<span style="color: var(--accent);">⏳ Syncing to Google Sheets...</span>';
+try {
+const caseData = JSON.parse(localStorage.getItem(lastSavedCaseKey));
+await fetch(WEB_APP_URL, {
+method: 'POST',
+mode: 'no-cors', // Important for Google Apps Script
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ action: 'syncCase', caseData })
+});
+syncStatus.innerHTML = <span style="color: var(--success);">✅ Synced to Google Sheets! (Last synced: ${new Date().toLocaleTimeString()})</span>;
+syncBtn.textContent = 'Sync to Sheets';
+syncBtn.disabled = false;
+} catch (error) {
+console.error('Sync error:', error);
+syncStatus.innerHTML = <span style="color: var(--danger);">❌ Sync failed: ${error.message}</span>;
+syncBtn.textContent = 'Retry Sync';
+syncBtn.disabled = false;
+}
+}
+function setupInvestigatorDropdown() {
+const serviceSelect = document.getElementById('service');
+const investigatorSelect = document.getElementById('investigator');
+const investigatorsDefault = ['Conrad', 'Delores', 'Lisa', 'Michael', 'Jeff'];
+const investigatorsSurveillance = ['Freddy', 'Ricardo', 'Delores', 'Michael', 'Alma', 'Manuel', 'Jeff'];
+function populateInvestigators(service) {
+investigatorSelect.innerHTML = '';
+let list = [];
+if (service === 'Surveillance') {
+list = investigatorsSurveillance;
+} else {
+list = investigatorsDefault;
+}
+list.forEach(name => {
+const opt = document.createElement('option');
+opt.value = name;
+opt.textContent = name;
+investigatorSelect.appendChild(opt);
+});
+if (list.length > 0) investigatorSelect.value = list[0];
+}
+populateInvestigators(serviceSelect.value || 'AOE/COE');
+serviceSelect.addEventListener('change', () => {
+populateInvestigators(serviceSelect.value);
+});
+}
+function setupAutofillListeners() {
+const fieldsToAutofill = [
+{ id: 'adjuster-name', handler: handleAdjusterInput },
+{ id: 'company-name', handler: handleCompanyInput },
+{ id: 'attorney-name', handler: handleAttorneyInput },
+{ id: 'attorney-company', handler: handleAttorneyCompanyInput },
+{ id: 'employer-contact', handler: handleEmployerContactInput },
+{ id: 'employer-company', handler: handleEmployerCompanyInput }
+];
+fieldsToAutofill.forEach(fieldInfo => {
+const field = document.getElementById(fieldInfo.id);
+if (field) {
+field.addEventListener('input', fieldInfo.handler);
+field.addEventListener('change', fieldInfo.handler); // Ensure it triggers on datalist selection
+}
+});
+}
+// Force autofill to trigger after selecting from datalist
+document.querySelectorAll('input[list]').forEach(input => {
+input.addEventListener('blur', () => {
+const event = new Event('change', { bubbles: true });
+input.dispatchEvent(event);
+});
+});
+</script>
+</body>
+</html>

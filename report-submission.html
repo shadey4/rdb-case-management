@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Report Submission</title>
+<link rel="stylesheet" href="charcoal.css">
+</head>
+<body>
+<header class="site-header">
+<div class="site-title">Report Submission</div>
+<nav class="site-nav">
+<div class="menu-group">
+<button class="btn btn-primary" onclick="location.href='dashboard.html'">Dashboard</button>
+<div class="dropdown">
+<button class="btn">Forms ▾</button>
+<div class="dropdown-menu">
+<a href="intake.html">Intake</a>
+<a href="schedule-interview.html">Schedule Interview</a>
+<a href="update.html">Update</a>
+<a href="report-submission.html">Report Submission</a>
+<a href="billing.html">Billing</a>
+</div>
+</div>
+<div class="dropdown">
+<button class="btn">Reports ▾</button>
+<div class="dropdown-menu">
+<a href="scorecard.html">Scorecard</a>
+<a href="pipeline.html">Pipeline</a>
+</div>
+</div>
+</div>
+</nav>
+</header>
+<main class="content">
+<section class="form-container" id="report-submission-form">
+<h1 class="form-title">Report Submission</h1>
+
+<!-- CASE INFORMATION -->
+  <h3 class="section-header">Case Information</h3>
+  <section class="form-section" id="case-section">
+    <div class="form-field">
+      <select id="case-select" onchange="loadCaseDetails()">
+        <option value="">Select Case (required)</option>
+      </select>
+    </div>
+
+    <div id="case-details" style="display: none; margin-top: 1rem;">
+      <div class="form-field">
+        <input type="text" id="display-claim-number" placeholder="Claim Number" readonly>
+      </div>
+      <div class="grid two-col">
+        <div class="form-field">
+          <input type="text" id="display-client" placeholder="Client" readonly>
+        </div>
+        <div class="form-field">
+          <input type="text" id="display-claimant" placeholder="Claimant" readonly>
+        </div>
+      </div>
+      <div class="grid two-col">
+        <div class="form-field">
+          <input type="text" id="display-date-opened" placeholder="Date Opened" readonly>
+        </div>
+        <div class="form-field">
+          <input type="text" id="display-last-interview" placeholder="Last Interview" readonly>
+        </div>
+      </div>
+      <div id="date-submitted-display" class="date-submitted" style="display:none;">
+        <strong>✓ Date Submitted:</strong> <span id="submission-date-value"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ALERT -->
+  <div id="alert-box" style="display:none;"></div>
+
+  <!-- REQUIRED ITEMS -->
+  <h3 class="section-header">Required Submission Items</h3>
+  <section class="form-section" id="submission-items-section">
+    <div class="checkbox-item">
+      <label>
+        <input type="checkbox" id="check-interviews" onchange="validateForm()">
+        <span class="checkbox-label">All scheduled interviews for this case are complete</span>
+      </label>
+      <div class="checkbox-note">Investigator must confirm completion before submission</div>
+    </div>
+
+    <div class="checkbox-item">
+      <label>
+        <input type="checkbox" id="check-billing" onchange="validateForm()">
+        <span class="checkbox-label">Billing has been submitted for this investigation</span>
+      </label>
+      <div class="checkbox-note">This is separate from final client billing.</div>
+    </div>
+
+    <div class="checkbox-item">
+      <label>
+        <input type="checkbox" id="check-attachments" onchange="validateForm()">
+        <span class="checkbox-label">All photos, videos, and documents have been uploaded/sent</span>
+      </label>
+      <div class="checkbox-note">File upload automation coming soon.</div>
+    </div>
+
+    <div class="checkbox-item">
+      <label>
+        <input type="checkbox" id="check-updates" onchange="validateForm()">
+        <span class="checkbox-label">All case updates provided (<a href="update.html" target="_blank">Submit Update</a>)</span>
+      </label>
+      <div class="checkbox-note">Ensure updates are logged before submission.</div>
+    </div>
+
+    <div class="checkbox-item">
+      <label>
+        <input type="checkbox" id="check-witness" onchange="validateForm()">
+        <span class="checkbox-label">Witness sheet/contact list provided</span>
+      </label>
+      <div class="checkbox-note">Confirm witness information is complete.</div>
+    </div>
+
+    <div class="form-field" style="margin-top: 1rem;">
+      <textarea id="additional-notes" rows="3" placeholder="Additional Notes (optional)"></textarea>
+    </div>
+  </section>
+  <!-- BUTTONS -->
+  <div class="button-container">
+    <button type="button" class="btn" id="save-btn" onclick="saveReportSubmission()" disabled title="Complete all required items before submitting">Save</button>
+    <button type="button" class="btn btn-secondary" id="sync-btn" onclick="syncToSheets()" disabled>Sync to Sheets</button>
+    <button type="button" class="btn btn-secondary" onclick="window.location.href='dashboard.html'">Cancel</button>
+  </div>
+
+  <div id="sync-status" class="sync-status"></div>
+
+  <!-- QUICK LINKS -->
+  <div class="quick-links">
+    <strong>Next:</strong>
+    <a href="billing.html">Billing</a> |
+    <a href="dashboard.html">Dashboard</a> |
+    <a href="scorecard.html">Scorecard</a> |
+    <a href="pipeline.html">Pipeline</a>
+  </div>
+</section>
+</main>
+<footer class="site-footer">
+<div class="version-stamp">RDB Case Management v1.3</div>
+</footer>
+<script>
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzp7EWEWddYYqQMfBRcA2eriHkbbvCllS-9IOo-panx2Ve04oJThBxUINCuSN_7DwEzFg/exec';
+let selectedCaseKey = null;
+let lastInterviewDate = null;
+let lastSavedReportKey = null;
+let lastSavedCaseKey = null;
+
+document.addEventListener('DOMContentLoaded', loadScheduledCases);
+
+function loadScheduledCases() {
+const caseSelect = document.getElementById('case-select');
+const cases = [];
+
+for (let i = 0; i < localStorage.length; i++) {
+const key = localStorage.key(i);
+if (key.startsWith('case_')) {
+try {
+const caseData = JSON.parse(localStorage.getItem(key));
+// Filter to include 'Open' and 'Scheduled' cases
+if (['Open', 'Scheduled'].includes(caseData.status)) {
+cases.push({
+key,
+claimNumber: caseData.claimNumber || 'N/A',
+client: caseData.clientCompany || 'N/A',
+claimant: (caseData.claimantFirst || '') + ' ' + (caseData.claimantLast || '')
+});
+}
+} catch (e) {
+console.error('Error parsing case:', key, e);
+}
+}
+}
+
+cases.sort((a, b) => a.claimNumber.localeCompare(b.claimNumber));
+caseSelect.innerHTML = '<option value="">-- Select a Case --</option>';
+cases.forEach(c => {
+const option = document.createElement('option');
+option.value = c.key;
+option.textContent = `${c.claimNumber} - ${c.client} - ${c.claimant}`;
+caseSelect.appendChild(option);
+});
+}
+
+function loadCaseDetails() {
+selectedCaseKey = document.getElementById('case-select').value;
+if (!selectedCaseKey) {
+document.getElementById('case-details').style.display = 'none';
+document.getElementById('alert-box').style.display = 'none';
+return;
+}
+
+const caseData = JSON.parse(localStorage.getItem(selectedCaseKey));
+document.getElementById('case-details').style.display = 'block';
+document.getElementById('display-claim-number').value = caseData.claimNumber || 'N/A';
+document.getElementById('display-client').value = caseData.clientCompany || 'N/A';
+document.getElementById('display-claimant').value =
+(caseData.claimantFirst || '') + ' ' + (caseData.claimantLast || '');
+document.getElementById('display-date-opened').value =
+caseData.dateCreated ? new Date(caseData.dateCreated).toLocaleDateString() : 'N/A';
+
+findLastInterview();
+calculate24HourRule();
+}
+
+function findLastInterview() {
+const interviews = [];
+for (let i = 0; i < localStorage.length; i++) {
+const key = localStorage.key(i);
+if (key.startsWith('interview_')) {
+try {
+const interview = JSON.parse(localStorage.getItem(key));
+if (interview.caseKey === selectedCaseKey) {
+interviews.push(new Date(interview.interviewDate));
+}
+} catch (e) { console.error('Error reading interview', e); }
+}
+}
+if (interviews.length > 0) {
+interviews.sort((a, b) => b - a);
+lastInterviewDate = interviews[0];
+document.getElementById('display-last-interview').value = lastInterviewDate.toLocaleDateString();
+} else {
+lastInterviewDate = null;
+document.getElementById('display-last-interview').value = 'No interviews found';
+}
+}
+
+function calculate24HourRule() {
+const alertBox = document.getElementById('alert-box');
+if (!lastInterviewDate) {
+alertBox.className = 'alert-box alert-warning';
+alertBox.innerHTML = '⚠️ No interviews found for this case.';
+alertBox.style.display = 'block';
+return;
+}
+
+const hoursSince = (Date.now() - lastInterviewDate) / (1000 * 60 * 60);
+let alertClass, alertMessage;
+
+if (hoursSince <= 24) {
+alertClass = 'alert-success';
+alertMessage = '✅ On Schedule: Report within 24-hour window';
+} else if (hoursSince <= 48) {
+alertClass = 'alert-warning';
+alertMessage = '⏰ Approaching Deadline: Report should be submitted soon';
+} else {
+alertClass = 'alert-danger';
+alertMessage = `⚠️ OVERDUE: Should have been submitted within 24 hours (${lastInterviewDate.toLocaleDateString()})`;
+}
+
+alertBox.className = `alert-box ${alertClass}`;
+alertBox.innerHTML = alertMessage;
+alertBox.style.display = 'block';
+}
+
+function validateForm() {
+const allChecked = ['check-interviews','check-billing','check-attachments','check-updates','check-witness']
+.every(id => document.getElementById(id).checked);
+const saveBtn = document.getElementById('save-btn');
+saveBtn.disabled = !allChecked;
+}
+
+function saveReportSubmission() {
+if (!selectedCaseKey) {
+alert('Select a case first.');
+return;
+}
+
+const caseData = JSON.parse(localStorage.getItem(selectedCaseKey));
+const submissionDate = new Date();
+const reportKey = 'report_' + Date.now();
+
+const reportData = {
+caseKey: selectedCaseKey,
+claimNumber: caseData.claimNumber || 'N/A',
+investigator: caseData.investigatorAssigned || 'Conrad',
+submissionDate: submissionDate.toISOString(),
+lastInterviewDate: lastInterviewDate ? lastInterviewDate.toISOString() : null,
+notes: document.getElementById('additional-notes').value.trim() || null
+};
+
+localStorage.setItem(reportKey, JSON.stringify(reportData));
+lastSavedReportKey = reportKey;
+
+caseData.status = 'Completed';
+caseData.dateCompleted = submissionDate.toISOString();
+localStorage.setItem(selectedCaseKey, JSON.stringify(caseData));
+lastSavedCaseKey = selectedCaseKey;
+
+document.getElementById('sync-btn').disabled = false;
+document.getElementById('sync-status').innerHTML = '<span style="color: var(--warning);">⚠️ Not synced to Sheets yet</span>';
+document.getElementById('submission-date-value').textContent = submissionDate.toLocaleString();
+document.getElementById('date-submitted-display').style.display = 'block';
+alert('Report submission saved locally.\n\nClick "Sync to Sheets" to back up.');
+}
+
+async function syncToSheets() {
+if (!lastSavedReportKey || !lastSavedCaseKey) {
+alert('Please save before syncing.');
+return;
+}
+
+const syncBtn = document.getElementById('sync-btn');
+const syncStatus = document.getElementById('sync-status');
+syncBtn.disabled = true;
+syncBtn.textContent = 'Syncing...';
+syncStatus.innerHTML = '<span style="color: var(--accent);">⏳ Syncing...</span>';
+
+try {
+const reportData = JSON.parse(localStorage.getItem(lastSavedReportKey));
+const caseData = JSON.parse(localStorage.getItem(lastSavedCaseKey));
+
+await fetch(WEB_APP_URL, {
+method: 'POST',
+mode: 'no-cors',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ action: 'syncReport', reportData })
+});
+
+await fetch(WEB_APP_URL, {
+method: 'POST',
+mode: 'no-cors',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ action: 'syncCase', caseData })
+});
+
+syncStatus.innerHTML = `<span style="color: var(--success);">✅ Synced successfully (${new Date().toLocaleTimeString()})</span>`;
+} catch (error) {
+console.error(error);
+syncStatus.innerHTML = `<span style="color: var(--danger);">❌ Sync failed: ${error.message}</span>`;
+} finally {
+syncBtn.textContent = 'Sync to Sheets';
+syncBtn.disabled = false;
+}
+}
+</script>
+</body>
+</html>

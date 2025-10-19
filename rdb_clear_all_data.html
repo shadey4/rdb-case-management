@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RDB - Clear All Data</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #eee;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            max-width: 700px;
+            background: #0f3460;
+            padding: 30px 40px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #3949ab;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #aaa;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .warning-box {
+            background-color: #ff6b6b;
+            color: white;
+            border-left: 5px solid #c92a2a;
+            padding: 15px 20px;
+            margin-bottom: 25px;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+        .info-box {
+            background-color: rgba(57, 73, 171, 0.3);
+            border-left: 5px solid #3949ab;
+            padding: 15px 20px;
+            margin-bottom: 25px;
+            border-radius: 6px;
+        }
+        .info-box h3 {
+            margin-top: 0;
+            color: #5c6bc0;
+        }
+        .info-box ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .info-box li {
+            margin-bottom: 5px;
+        }
+        .stats {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 25px;
+        }
+        .stats h3 {
+            margin-top: 0;
+            color: #5c6bc0;
+        }
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .stat-item:last-child {
+            border-bottom: none;
+        }
+        .stat-label {
+            color: #bbb;
+        }
+        .stat-value {
+            color: #fff;
+            font-weight: bold;
+        }
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 25px;
+        }
+        button {
+            flex: 1;
+            padding: 15px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .btn-scan {
+            background-color: #3949ab;
+            color: white;
+        }
+        .btn-scan:hover {
+            background-color: #303f9f;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(57, 73, 171, 0.4);
+        }
+        .btn-clear {
+            background-color: #d32f2f;
+            color: white;
+        }
+        .btn-clear:hover {
+            background-color: #c62828;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(211, 47, 47, 0.4);
+        }
+        .btn-clear:disabled {
+            background-color: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+        #status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.2);
+            display: none;
+        }
+        .status-success {
+            background-color: rgba(76, 175, 80, 0.2);
+            color: #81c784;
+            border-color: #66bb6a;
+        }
+        .status-error {
+            background-color: rgba(244, 67, 54, 0.2);
+            color: #ef5350;
+            border-color: #e57373;
+        }
+        .status-info {
+            background-color: rgba(57, 73, 171, 0.2);
+            color: #5c6bc0;
+            border-color: #3949ab;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🧹 RDB Data Cleanup Tool</h1>
+    <div class="subtitle">Clear localStorage data from your browser</div>
+    
+    <div class="warning-box">
+        ⚠️ WARNING: This will permanently delete ALL local data including cases, billing records, interviews, reports, and updates. This action cannot be undone!
+    </div>
+
+    <div class="info-box">
+        <h3>What This Tool Does:</h3>
+        <ul>
+            <li><strong>Scans</strong> your browser's localStorage for RDB data</li>
+            <li><strong>Shows</strong> you what will be deleted before you commit</li>
+            <li><strong>Clears</strong> all case-related data when you confirm</li>
+        </ul>
+        <p><strong>Data Types Cleared:</strong></p>
+        <ul>
+            <li>Cases (case_*)</li>
+            <li>Billing records (billing_*)</li>
+            <li>Interviews (interview_*)</li>
+            <li>Reports (report_*, reportSubmission_*)</li>
+            <li>Updates (update_*)</li>
+            <li>Recent history lists (recentAdjusters, recentClients, etc.)</li>
+        </ul>
+    </div>
+
+    <div class="stats" id="stats-container" style="display: none;">
+        <h3>Current Data Summary:</h3>
+        <div class="stat-item">
+            <span class="stat-label">Cases:</span>
+            <span class="stat-value" id="count-cases">0</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Billing Records:</span>
+            <span class="stat-value" id="count-billing">0</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Interviews:</span>
+            <span class="stat-value" id="count-interviews">0</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Reports:</span>
+            <span class="stat-value" id="count-reports">0</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Updates:</span>
+            <span class="stat-value" id="count-updates">0</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Total Items:</span>
+            <span class="stat-value" id="count-total">0</span>
+        </div>
+    </div>
+
+    <div class="button-group">
+        <button id="scan-button" class="btn-scan">🔍 Scan Data</button>
+        <button id="clear-button" class="btn-clear" disabled>🗑️ Clear All Data</button>
+    </div>
+
+    <div id="status"></div>
+</div>
+
+<script>
+let dataStats = {
+    cases: 0,
+    billing: 0,
+    interviews: 0,
+    reports: 0,
+    updates: 0,
+    total: 0
+};
+
+document.getElementById('scan-button').addEventListener('click', scanLocalStorage);
+document.getElementById('clear-button').addEventListener('click', confirmAndClear);
+
+function scanLocalStorage() {
+    const statusDiv = document.getElementById('status');
+    statusDiv.style.display = 'none';
+
+    // Reset counters
+    dataStats = {
+        cases: 0,
+        billing: 0,
+        interviews: 0,
+        reports: 0,
+        updates: 0,
+        total: 0
+    };
+
+    // Count all RDB-related items
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        
+        if (key.startsWith('case_')) {
+            dataStats.cases++;
+            dataStats.total++;
+        } else if (key.startsWith('billing_')) {
+            dataStats.billing++;
+            dataStats.total++;
+        } else if (key.startsWith('interview_')) {
+            dataStats.interviews++;
+            dataStats.total++;
+        } else if (key.startsWith('report_') || key.startsWith('reportSubmission_')) {
+            dataStats.reports++;
+            dataStats.total++;
+        } else if (key.startsWith('update_')) {
+            dataStats.updates++;
+            dataStats.total++;
+        } else if (key.startsWith('recent')) {
+            // Count recent lists
+            dataStats.total++;
+        }
+    }
+
+    // Update display
+    document.getElementById('count-cases').textContent = dataStats.cases;
+    document.getElementById('count-billing').textContent = dataStats.billing;
+    document.getElementById('count-interviews').textContent = dataStats.interviews;
+    document.getElementById('count-reports').textContent = dataStats.reports;
+    document.getElementById('count-updates').textContent = dataStats.updates;
+    document.getElementById('count-total').textContent = dataStats.total;
+
+    document.getElementById('stats-container').style.display = 'block';
+
+    // Enable clear button if data exists
+    const clearButton = document.getElementById('clear-button');
+    if (dataStats.total > 0) {
+        clearButton.disabled = false;
+        statusDiv.textContent = `✅ Scan complete! Found ${dataStats.total} items ready to clear.`;
+        statusDiv.className = 'status-info';
+    } else {
+        clearButton.disabled = true;
+        statusDiv.textContent = '✅ Scan complete! No RDB data found in localStorage.';
+        statusDiv.className = 'status-success';
+    }
+    statusDiv.style.display = 'block';
+}
+
+function confirmAndClear() {
+    const confirmation = confirm(
+        `⚠️ FINAL WARNING ⚠️\n\n` +
+        `You are about to DELETE:\n` +
+        `• ${dataStats.cases} cases\n` +
+        `• ${dataStats.billing} billing records\n` +
+        `• ${dataStats.interviews} interviews\n` +
+        `• ${dataStats.reports} reports\n` +
+        `• ${dataStats.updates} updates\n` +
+        `• Total: ${dataStats.total} items\n\n` +
+        `This CANNOT be undone!\n\n` +
+        `Type "DELETE" in the next prompt to confirm.`
+    );
+
+    if (!confirmation) return;
+
+    const typeConfirm = prompt('Type DELETE (in capitals) to confirm:');
+    if (typeConfirm !== 'DELETE') {
+        alert('❌ Deletion cancelled. Text did not match "DELETE".');
+        return;
+    }
+
+    clearAllData();
+}
+
+function clearAllData() {
+    const statusDiv = document.getElementById('status');
+    let deletedCount = 0;
+
+    try {
+        // Get all keys first (to avoid modifying while iterating)
+        const keysToDelete = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key.startsWith('case_') || 
+                key.startsWith('billing_') || 
+                key.startsWith('interview_') || 
+                key.startsWith('report_') || 
+                key.startsWith('reportSubmission_') || 
+                key.startsWith('update_') || 
+                key.startsWith('recent')) {
+                keysToDelete.push(key);
+            }
+        }
+
+        // Delete all identified keys
+        keysToDelete.forEach(key => {
+            localStorage.removeItem(key);
+            deletedCount++;
+        });
+
+        statusDiv.textContent = `✅ SUCCESS! Deleted ${deletedCount} items from localStorage. Your browser storage is now clean.`;
+        statusDiv.className = 'status-success';
+        statusDiv.style.display = 'block';
+
+        // Reset stats display
+        document.getElementById('stats-container').style.display = 'none';
+        document.getElementById('clear-button').disabled = true;
+
+    } catch (error) {
+        statusDiv.textContent = `❌ ERROR: ${error.message}`;
+        statusDiv.className = 'status-error';
+        statusDiv.style.display = 'block';
+    }
+}
+</script>
+
+</body>
+</html>

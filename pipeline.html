@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipeline - RDB Case Management</title>
+<link rel="stylesheet" href="charcoal.css">
+<style>
+.pipeline-container {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 2rem;
+}.tab-controls {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  border-bottom: 2px solid var(--border-dark);
+}
+.tab-btn {
+  padding: 0.75rem 1.5rem;
+  background: var(--charcoal-panel);
+  color: var(--text-secondary);
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+.tab-btn:hover {
+  color: var(--text-primary);
+  background: rgba(57, 73, 171, 0.1);
+}
+.tab-btn.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent);
+  background: rgba(57, 73, 171, 0.2);
+}
+.tab-content {
+  display: none;
+}
+.tab-content.active {
+  display: block;
+}
+.pipeline-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--charcoal-panel);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+  font-size: 0.85rem;
+}
+.pipeline-table thead {
+  background: var(--accent);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.pipeline-table th {
+  padding: 0.75rem 0.5rem;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-primary);
+  border: 1px solid var(--border-dark);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.pipeline-table th:hover {
+  background: var(--hover);
+}
+.pipeline-table th.sortable::after {
+  content: ' ⇅';
+  opacity: 0.5;
+}
+.pipeline-table th.sorted-asc::after {
+  content: ' ↑';
+  opacity: 1;
+}
+.pipeline-table th.sorted-desc::after {
+  content: ' ↓';
+  opacity: 1;
+}
+.pipeline-table td {
+  padding: 0.6rem 0.5rem;
+  border: 1px solid var(--border-dark);
+  color: var(--text-primary);
+}
+.pipeline-table tbody tr:hover {
+  background: rgba(57, 73, 171, 0.15);
+}
+.pipeline-table tbody tr:nth-child(even) {
+  background: rgba(0, 0, 0, 0.1);
+}
+.pipeline-table tbody tr:nth-child(even):hover {
+  background: rgba(57, 73, 171, 0.15);
+}
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+}
+.status-open { background: #e57373; color: #fff; }
+.status-scheduled { background: #ffb74d; color: #000; }
+.status-in-progress { background: #64b5f6; color: #fff; }
+.status-completed { background: #81c784; color: #000; }
+.status-verify { background: #ba68c8; color: #fff; }
+.status-billed { background: #4caf50; color: #fff; }
+.overdue {
+  background: rgba(229, 57, 53, 0.3);
+  font-weight: 600;
+}
+.due-soon {
+  background: rgba(255, 179, 0, 0.3);
+  font-weight: 600;
+}
+.notes-cell {
+  min-width: 150px;
+  max-width: 250px;
+}
+.notes-input {
+  width: 100%;
+  padding: 0.3rem;
+  background: var(--charcoal-bg);
+  border: 1px solid var(--border-dark);
+  color: var(--text-primary);
+  border-radius: 4px;
+  font-size: 0.8rem;
+  resize: vertical;
+  min-height: 40px;
+}
+.notes-input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+.summary-stats {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+.stat-box {
+  background: var(--charcoal-panel);
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-dark);
+  min-width: 150px;
+}
+.stat-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.3rem;
+}
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.col-claim { width: 100px; }
+.col-client { width: 120px; }
+.col-claimant { width: 130px; }
+.col-investigator { width: 110px; }
+.col-status { width: 100px; }
+.col-date { width: 90px; }
+.col-days { width: 70px; text-align: center; }
+.col-amount { width: 90px; text-align: right; }
+.col-notes { width: 200px; }
+.empty-state {
+  text-align: center;
+  padding: 3rem;
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+}
+.loading {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-secondary);
+}</style>
+</head>
+<body>
+<header class="site-header">
+<div class="site-title">Pipeline Report</div>
+<nav class="site-nav">
+<div class="menu-group">
+<button class="btn btn-primary" onclick="location.href='dashboard.html'">Dashboard</button>
+<div class="dropdown">
+<button class="btn">Forms ▾</button>
+<div class="dropdown-menu">
+<a href="intake.html">Intake</a>
+<a href="schedule-interview.html">Schedule Interview</a>
+<a href="update.html">Update Form</a>
+<a href="report-submission.html">Report Submission</a>
+<a href="billing.html">Billing</a>
+</div>
+</div>
+<div class="dropdown">
+<button class="btn">Reports ▾</button>
+<div class="dropdown-menu">
+<a href="scorecard.html">Scorecard</a>
+<a href="pipeline.html">Pipeline</a>
+</div>
+</div>
+</div>
+</nav>
+</header>
+<main class="pipeline-container">
+<h1 class="form-title">Case Pipeline</h1>
+<div class="tab-controls">
+<button class="tab-btn active" onclick="switchTab('active')">Active Cases</button>
+<button class="tab-btn" onclick="switchTab('closed')">Closed Cases</button>
+</div>
+<div id="active-tab" class="tab-content active">
+<div class="summary-stats" id="active-stats">
+<div class="stat-box">
+<div class="stat-label">Total Active</div>
+<div class="stat-value" id="active-total">0</div>
+</div>
+<div class="stat-box">
+<div class="stat-label">Open</div>
+<div class="stat-value" id="active-open">0</div>
+</div>
+<div class="stat-box">
+<div class="stat-label">Scheduled</div>
+<div class="stat-value" id="active-scheduled">0</div>
+</div>
+<div class="stat-box">
+<div class="stat-label">In Progress</div>
+<div class="stat-value" id="active-progress">0</div>
+</div>
+<div class="stat-box">
+<div class="stat-label">Completed</div>
+<div class="stat-value" id="active-completed">0</div>
+</div>
+<div class="stat-box">
+<div class="stat-label">Overdue Updates</div>
+<div class="stat-value" id="active-overdue" style="color: var(--danger);">0</div>
+</div>
+</div>
+<div class="table-container">
+<table class="pipeline-table">
+<thead>
+<tr>
+<th class="sortable col-claim" onclick="sortTable('active', 0)">Claim #</th>
+<th class="sortable col-client" onclick="sortTable('active', 1)">Client</th>
+<th class="sortable col-claimant" onclick="sortTable('active', 2)">Claimant</th>
+<th class="sortable col-investigator" onclick="sortTable('active', 3)">Investigator</th>
+<th class="sortable col-status" onclick="sortTable('active', 4)">Status</th>
+<th class="sortable col-date" onclick="sortTable('active', 5)">Assigned</th>
+<th class="sortable col-date" onclick="sortTable('active', 6)">Interview</th>
+<th class="sortable col-date" onclick="sortTable('active', 7)">Last Update</th>
+<th class="sortable col-days" onclick="sortTable('active', 8)">Days Open</th>
+<th class="sortable col-days" onclick="sortTable('active', 9)">Days Since Update</th>
+<th class="sortable col-date" onclick="sortTable('active', 10)">Next Update Due</th>
+<th class="sortable col-date" onclick="sortTable('active', 11)">Expected Complete</th>
+<th class="col-notes">Conrad Notes</th>
+</tr>
+</thead>
+<tbody id="active-cases-body">
+<tr>
+<td colspan="13" class="loading">Loading active cases...</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div id="closed-tab" class="tab-content">
+<div class="summary-stats" id="closed-stats">
+<div class="stat-box">
+<div class="stat-label">Total Closed</div>
+<div class="stat-value" id="closed-total">0</div>
+</div>
+<div class="stat-box">
+<div class="stat-label">This Month</div>
+<div class="stat-value" id="closed-month">0</div>
+</div>
+<div class="stat-box">
+<div class="stat-label">This Year</div>
+<div class="stat-value" id="closed-year">0</div>
+</div>
+<div class="stat-box">
+<div class="stat-label">Total Billed</div>
+<div class="stat-value" id="closed-billed">$0</div>
+</div>
+<div class="stat-box">
+<div class="stat-label">Avg Turnaround</div>
+<div class="stat-value" id="closed-avg-days">0 days</div>
+</div>
+</div>
+<div class="table-container">
+<table class="pipeline-table">
+<thead>
+<tr>
+<th class="sortable col-claim" onclick="sortTable('closed', 0)">Claim #</th>
+<th class="sortable col-client" onclick="sortTable('closed', 1)">Client</th>
+<th class="sortable col-claimant" onclick="sortTable('closed', 2)">Claimant</th>
+<th class="sortable col-investigator" onclick="sortTable('closed', 3)">Investigator</th>
+<th class="sortable col-date" onclick="sortTable('closed', 4)">Assigned</th>
+<th class="sortable col-date" onclick="sortTable('closed', 5)">Interview</th>
+<th class="sortable col-date" onclick="sortTable('closed', 6)">Completed</th>
+<th class="sortable col-date" onclick="sortTable('closed', 7)">Billed</th>
+<th class="sortable col-days" onclick="sortTable('closed', 8)">Turnaround</th>
+<th class="sortable col-amount" onclick="sortTable('closed', 9)">Amount</th>
+<th class="col-notes">Conrad Notes</th>
+</tr>
+</thead>
+<tbody id="closed-cases-body">
+<tr>
+<td colspan="11" class="loading">Loading closed cases...</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</main>
+<footer class="site-footer">
+<div class="version-stamp">RDB Case Management v1.3</div>
+<div class="footer-links">
+    <a href="dashboard.html">Dashboard</a>
+    <a href="scorecard.html">Scorecard</a>
+    <a href="billing.html">Billing</a>
+    <a href="report-submission.html">Report Submission</a>
+</div>
+</footer>
+<script>
+let activeCases = [];
+let closedCases = [];
+let currentSortColumn = { active: -1, closed: -1 };
+let currentSortDirection = { active: 'asc', closed: 'asc' };
+document.addEventListener('DOMContentLoaded', function() {
+  // --- Start of data scrubbing ---
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const key = localStorage.key(i);
+    if (key.startsWith('client_') || key.startsWith('adjuster_') || key.includes('Client.csv')) {
+      localStorage.removeItem(key);
+    }
+  }
+  // --- End of data scrubbing ---
+  loadAllCases();
+});
+
+function loadAllCases() {
+  activeCases = [];
+  closedCases = [];
+
+  const cases = {};
+  const interviews = {};
+  const updates = {};
+  const reports = {};
+  const billings = {};
+
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    const data = JSON.parse(localStorage.getItem(key));
+
+    if (key.startsWith('case_')) cases[key] = data;
+    else if (key.startsWith('interview_')) interviews[key] = data;
+    else if (key.startsWith('update_')) updates[key] = data;
+    else if (key.startsWith('reportSubmission_')) reports[key] = data;
+    else if (key.startsWith('billing_')) billings[key] = data;
+  }
+
+  Object.keys(cases).forEach(caseKey => {
+    const caseData = cases[caseKey];
+    // Filter out stale case keys with missing claim numbers or default “N/A” values
+    if (!caseData.claimNumber || caseData.claimNumber === 'N/A') return;
+
+    const processedCase = processCaseData(caseKey, caseData, interviews, updates, reports, billings);
+
+    if (caseData.status === 'Billed' || caseData.status === 'Closed') {
+      closedCases.push(processedCase);
+    } else {
+      activeCases.push(processedCase);
+    }
+  });
+
+  renderActiveCases();
+  renderClosedCases();
+  updateStats();
+}
+
+function processCaseData(caseKey, caseData, interviews, updates, reports, billings) {
+  const processed = {
+    key: caseKey,
+    claimNumber: caseData.claimNumber || 'N/A',
+    client: caseData.clientCompany || 'N/A',
+    claimant: caseData.claimantName || 'N/A',
+    investigator: caseData.investigatorAssigned || 'Not assigned',
+    status: caseData.status || 'Open',
+    assignedDate: caseData.assignmentDate || null,
+    interviewDate: null,
+    lastUpdate: caseData.lastUpdate || null,
+    completedDate: null,
+    billedDate: null,
+    billedAmount: 0,
+    daysOpen: 0,
+    daysSinceUpdate: 0,
+    updateDueDate: caseData.dueDate || null,
+    expectedComplete: null,
+    turnaround: 0,
+    conradNotes: caseData.conradNotes || ''
+  };
+
+  let earliestInterviewDate = null;
+  Object.values(interviews).forEach(interview => {
+    if (interview.caseKey === caseKey && interview.interviewDate) {
+      if (!earliestInterviewDate || new Date(interview.interviewDate) < new Date(earliestInterviewDate)) {
+        earliestInterviewDate = interview.interviewDate;
+      }
+    }
+  });
+  processed.interviewDate = earliestInterviewDate;
+
+  let latestUpdateDate = processed.assignedDate;
+  Object.values(updates).forEach(update => {
+    if (update.caseKey === caseKey && update.updateDate) {
+      if (!latestUpdateDate || new Date(update.updateDate) > new Date(latestUpdateDate)) {
+        latestUpdateDate = update.updateDate;
+      }
+    }
+  });
+  processed.lastUpdate = latestUpdateDate;
+
+
+  Object.values(reports).forEach(report => {
+    if (report.caseKey === caseKey && report.submissionDate) {
+      processed.completedDate = report.submissionDate;
+    }
+  });
+
+  Object.values(billings).forEach(billing => {
+    if (billing.caseKey === caseKey) {
+      processed.billedDate = billing.billingDate;
+      processed.billedAmount = parseFloat(billing.billingAmount || 0);
+    }
+  });
+
+  if (processed.assignedDate) {
+    const assigned = new Date(processed.assignedDate);
+    const endDate = processed.status === 'Billed' ? new Date(processed.billedDate) : new Date();
+    processed.daysOpen = Math.floor((endDate - assigned) / (1000 * 60 * 60 * 24));
+  }
+
+  if (processed.lastUpdate) {
+    const lastUpdate = new Date(processed.lastUpdate);
+    const today = new Date();
+    processed.daysSinceUpdate = Math.floor((today - lastUpdate) / (1000 * 60 * 60 * 24));
+  }
+
+  if (processed.assignedDate && processed.completedDate) {
+    const assigned = new Date(processed.assignedDate);
+    const completed = new Date(processed.completedDate);
+    processed.turnaround = Math.floor((completed - assigned) / (1000 * 60 * 60 * 24));
+  }
+
+  if (processed.interviewDate) {
+    const interview = new Date(processed.interviewDate);
+    const expected = new Date(interview);
+    expected.setDate(expected.getDate() + 30);
+    processed.expectedComplete = expected.toISOString().split('T')[0];
+  } else if (processed.assignedDate) {
+    const assigned = new Date(processed.assignedDate);
+    const expected = new Date(assigned);
+    expected.setDate(expected.getDate() + 45);
+    processed.expectedComplete = expected.toISOString().split('T')[0];
+  }
+
+  return processed;
+}
+
+function renderActiveCases() {
+  const tbody = document.getElementById('active-cases-body');
+
+  if (activeCases.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="13" class="empty-state">No active cases found</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = activeCases.map(c => {
+    const daysClass = c.daysSinceUpdate > 7 ? 'overdue' : c.daysSinceUpdate > 5 ? 'due-soon' : '';
+  const statusClass = `status-${c.status.toLowerCase().replace(/\s+/g, '-')}`;
+
+  return `
+  <tr data-case-key="${c.key}">
+  <td class="col-claim" contenteditable="true" onblur="saveCellEdit(this, 'claimNumber')">${c.claimNumber}</td>
+  <td class="col-client" contenteditable="true" onblur="saveCellEdit(this, 'clientCompany')">${c.client}</td>
+  <td class="col-claimant" contenteditable="true" onblur="saveCellEdit(this, 'claimantName')">${c.claimant}</td>
+  <td class="col-investigator" contenteditable="true" onblur="saveCellEdit(this, 'investigatorAssigned')">${c.investigator}</td>
+  <td class="col-status"><span class="status-badge ${statusClass}" contenteditable="true" onblur="saveCellEdit(this, 'status')">${c.status}</span></td>
+  <td class="col-date" contenteditable="true" onblur="saveCellEdit(this, 'assignmentDate')">${formatDate(c.assignedDate)}</td>
+  <td class="col-date" contenteditable="true" onblur="saveCellEdit(this, 'interviewDate')">${formatDate(c.interviewDate)}</td>
+  <td class="col-date" contenteditable="true" onblur="saveCellEdit(this, 'lastUpdate')">${formatDate(c.lastUpdate)}</td>
+  <td class="col-days" contenteditable="true" onblur="saveCellEdit(this, 'daysOpen')">${c.daysOpen}</td>
+  <td class="col-days ${daysClass}" contenteditable="true" onblur="saveCellEdit(this, 'daysSinceUpdate')">${c.daysSinceUpdate}</td>
+  <td class="col-date" contenteditable="true" onblur="saveCellEdit(this, 'dueDate')">${formatDate(c.updateDueDate)}</td>
+  <td class="col-date" contenteditable="true" onblur="saveCellEdit(this, 'expectedComplete')">${formatDate(c.expectedComplete)}</td>
+  <td class="col-notes notes-cell">
+  <textarea class="notes-input" onblur="saveNotes(this, '${c.key}')">${c.conradNotes}</textarea>
+  </td>
+  </tr>
+  `;
+  }).join('');
+}
+
+function renderClosedCases() {
+  const tbody = document.getElementById('closed-cases-body');
+
+  if (closedCases.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="11" class="empty-state">No closed cases found</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = closedCases.map(c => {
+    return `
+    <tr data-case-key="${c.key}">
+    <td class="col-claim" contenteditable="true" onblur="saveCellEdit(this, 'claimNumber')">${c.claimNumber}</td>
+    <td class="col-client" contenteditable="true" onblur="saveCellEdit(this, 'clientCompany')">${c.client}</td>
+    <td class="col-claimant" contenteditable="true" onblur="saveCellEdit(this, 'claimantName')">${c.claimant}</td>
+    <td class="col-investigator" contenteditable="true" onblur="saveCellEdit(this, 'investigatorAssigned')">${c.investigator}</td>
+    <td class="col-date" contenteditable="true" onblur="saveCellEdit(this, 'assignmentDate')">${formatDate(c.assignedDate)}</td>
+    <td class="col-date" contenteditable="true" onblur="saveCellEdit(this, 'interviewDate')">${formatDate(c.interviewDate)}</td>
+    <td class="col-date" contenteditable="true" onblur="saveCellEdit(this, 'completedDate')">${formatDate(c.completedDate)}</td>
+    <td class="col-date" contenteditable="true" onblur="saveCellEdit(this, 'billedDate')">${formatDate(c.billedDate)}</td>
+    <td class="col-days" contenteditable="true" onblur="saveCellEdit(this, 'turnaround')">${c.turnaround}</td>
+    <td class="col-amount" contenteditable="true" onblur="saveCellEdit(this, 'billedAmount')">$${c.billedAmount.toFixed(2)}</td>
+    <td class="col-notes notes-cell">
+    <textarea class="notes-input" onblur="saveNotes(this, '${c.key}')">${c.conradNotes}</textarea>
+    </td>
+    </tr>
+    `;
+  }).join('');
+}
+
+function updateStats() {
+  document.getElementById('active-total').textContent = activeCases.length;
+  document.getElementById('active-open').textContent =
+  activeCases.filter(c => c.status === 'Open').length;
+  document.getElementById('active-scheduled').textContent =
+  activeCases.filter(c => c.status === 'Scheduled').length;
+  document.getElementById('active-progress').textContent =
+  activeCases.filter(c => c.status === 'In Progress').length;
+  document.getElementById('active-completed').textContent =
+  activeCases.filter(c => c.status === 'Completed').length;
+  document.getElementById('active-overdue').textContent =
+  activeCases.filter(c => c.daysSinceUpdate > 7).length;
+
+  document.getElementById('closed-total').textContent = closedCases.length;
+
+  const today = new Date();
+  const thisMonth = closedCases.filter(c => {
+    const billedDate = new Date(c.billedDate);
+    return billedDate.getMonth() === today.getMonth() &&
+    billedDate.getFullYear() === today.getFullYear();
+  }).length;
+  document.getElementById('closed-month').textContent = thisMonth;
+
+  const thisYear = closedCases.filter(c => {
+    const billedDate = new Date(c.billedDate);
+    return billedDate.getFullYear() === today.getFullYear();
+  }).length;
+  document.getElementById('closed-year').textContent = thisYear;
+
+  const totalBilled = closedCases.reduce((sum, c) => sum + c.billedAmount, 0);
+  document.getElementById('closed-billed').textContent =
+  '$' + totalBilled.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const avgTurnaround = closedCases.length > 0
+  ? Math.round(closedCases.reduce((sum, c) => sum + c.turnaround, 0) / closedCases.length)
+  : 0;
+  document.getElementById('closed-avg-days').textContent = avgTurnaround + ' days';
+}
+
+function formatDate(dateStr) {
+  if (!dateStr || dateStr === 'N/A') return '-';
+  // Handle cases where dateStr might already be in MM/DD/YYYY format
+  if (dateStr.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+    return dateStr;
+  }
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return '-'; // Invalid date
+  return date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+  document.querySelector(`.tab-btn[onclick="switchTab('${tab}')"]`).classList.add('active');
+
+  document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+  document.getElementById(tab + '-tab').classList.add('active');
+}
+
+function sortTable(table, column) {
+  const cases = table === 'active' ? activeCases : closedCases;
+
+  if (currentSortColumn[table] === column) {
+    currentSortDirection[table] = currentSortDirection[table] === 'asc' ? 'desc' : 'asc';
+  } else {
+    currentSortColumn[table] = column;
+    currentSortDirection[table] = 'asc';
+  }
+
+  const columnKeys = table === 'active'
+  ? ['claimNumber', 'client', 'claimant', 'investigator', 'status', 'assignedDate',
+  'interviewDate', 'lastUpdate', 'daysOpen', 'daysSinceUpdate', 'updateDueDate', 'expectedComplete']
+  : ['claimNumber', 'client', 'claimant', 'investigator', 'assignedDate',
+  'interviewDate', 'completedDate', 'billedDate', 'turnaround', 'billedAmount'];
+
+  const key = columnKeys[column];
+  const direction = currentSortDirection[table] === 'asc' ? 1 : -1;
+
+  cases.sort((a, b) => {
+    let valA = a[key];
+    let valB = b[key];
+
+    if (['assignedDate', 'interviewDate', 'lastUpdate', 'updateDueDate', 'expectedComplete', 'completedDate', 'billedDate'].includes(key)) {
+      valA = valA ? new Date(valA).getTime() : 0;
+      valB = valB ? new Date(valB).getTime() : 0;
+    } else if (['daysOpen', 'daysSinceUpdate', 'turnaround', 'billedAmount'].includes(key)) {
+      valA = parseFloat(valA) || 0;
+      valB = parseFloat(valB) || 0;
+    }
+
+    if (typeof valA === 'number' && typeof valB === 'number') {
+      return (valA - valB) * direction;
+    }
+
+    return String(valA).localeCompare(String(valB)) * direction;
+  });
+
+  if (table === 'active') {
+    renderActiveCases();
+  } else {
+    renderClosedCases();
+  }
+
+  updateSortHeaders(table);
+}
+
+function updateSortHeaders(table) {
+  const tableElement = document.querySelector(`#${table}-tab .pipeline-table`);
+  const headers = tableElement.querySelectorAll('th.sortable');
+
+  headers.forEach((th, index) => {
+    th.classList.remove('sorted-asc', 'sorted-desc');
+    if (index === currentSortColumn[table]) {
+      th.classList.add(currentSortDirection[table] === 'asc' ? 'sorted-asc' : 'sorted-desc');
+    }
+  });
+}
+
+function saveNotes(textareaElement, caseKey) {
+  const newNotes = textareaElement.value.trim();
+
+  const caseData = JSON.parse(localStorage.getItem(caseKey));
+  caseData.conradNotes = newNotes;
+  localStorage.setItem(caseKey, JSON.stringify(caseData));
+
+  console.log('Notes saved for:', caseKey);
+}
+
+function saveCellEdit(element, fieldName) {
+  const caseKey = element.closest('tr').dataset.caseKey;
+  if (!caseKey) return;
+
+  let newValue = element.textContent.trim();
+  // Special handling for date fields to ensure correct format
+  if (element.classList.contains('col-date')) {
+    // Convert MM/DD/YYYY to YYYY-MM-DD for consistency if it's a date field
+    const parts = newValue.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    if (parts) {
+      newValue = `${parts[3]}-${parts[1]}-${parts[2]}`;
+    }
+  } else if (fieldName === 'billedAmount') {
+    // Remove non-numeric characters except for the decimal point
+    newValue = parseFloat(newValue.replace(/[^0-9.-]+/g,"")) || 0;
+  }
+
+  const caseData = JSON.parse(localStorage.getItem(caseKey));
+  // Update the correct field based on fieldName mapping in caseData structure
+  if (fieldName === 'clientCompany') caseData.clientCompany = newValue;
+  else if (fieldName === 'claimantName') caseData.claimantName = newValue;
+  else if (fieldName === 'investigatorAssigned') caseData.investigatorAssigned = newValue;
+  else if (fieldName === 'status') caseData.status = newValue;
+  else if (fieldName === 'assignmentDate') caseData.assignmentDate = newValue;
+  else if (fieldName === 'interviewDate') caseData.interviewDate = newValue;
+  else if (fieldName === 'lastUpdate') caseData.lastUpdate = newValue;
+  else if (fieldName === 'dueDate') caseData.dueDate = newValue; // Represents updateDueDate in pipeline
+  else if (fieldName === 'expectedComplete') caseData.expectedComplete = newValue;
+  else if (fieldName === 'completedDate') caseData.completedDate = newValue;
+  else if (fieldName === 'billedDate') caseData.billedDate = newValue;
+  else if (fieldName === 'billedAmount') caseData.billedAmount = newValue;
+  else if (fieldName === 'claimNumber') caseData.claimNumber = newValue;
+
+  localStorage.setItem(caseKey, JSON.stringify(caseData));
+  console.log(`Case ${caseKey}, field ${fieldName} updated to: ${newValue}`);
+
+  loadAllCases();
+}
+</script>
+</body>
+</html>

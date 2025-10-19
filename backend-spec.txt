@@ -1,0 +1,36 @@
+Sheet Structure:
+- Cases tab headers: CaseID, Claim Number, Investigator...
+- Billing tab headers: BillingID, Claim Number, Investigator...
+[etc.]
+
+Payload Formats Accepted:
+- Format A: {action: 'syncCase', caseData: {...}}
+- Format B: {sheet: 'Cases', data: {...}}
+
+Auto-ID Rules:
+- Cases → CA-0001, CA-0002...
+- Billing → BL-0001, BL-0002...
+```
+
+**2. `form-spec.txt`** (for ChatGPT form building)
+```
+Global Rules:
+- Use charcoal.css (no inline styles)
+- WEB_APP_URL = [your confirmed URL]
+- Save to localStorage first
+- Sync button disabled until saved
+- Success message format: "✅ Synced at [time]"
+
+Form Pattern (billing.html as template):
+- Section headers use .section-header class
+- Buttons use .btn / .btn-secondary classes
+- Sync status uses .sync-status div
+```
+
+**3. `data-flow.txt`** (for debugging/integration)
+```
+Intake → Cases tab
+Billing → Billing tab + Updates Cases.status to 'Billed'
+Schedule Interview → Interviews tab
+Report Submission → Reports tab
+Update → Updates tab

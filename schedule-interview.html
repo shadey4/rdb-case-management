@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Schedule Interview</title>
+<link rel="stylesheet" href="charcoal.css">
+</head>
+<body>
+<header class="site-header">
+<div class="site-title">Schedule Interview</div>
+<nav class="site-nav">
+<div class="menu-group">
+<button class="btn btn-primary" onclick="window.location.href='dashboard.html'">Dashboard</button>
+<div class="dropdown">
+<button class="btn">Forms ▾</button>
+<div class="dropdown-menu">
+<a href="intake.html">Intake</a>
+<a href="schedule-interview.html">Schedule Interview</a>
+<a href="update.html">Update</a>
+<a href="report-submission.html">Report Submission</a>
+<a href="billing.html">Billing</a>
+</div>
+</div>
+<div class="dropdown">
+<button class="btn">Reports ▾</button>
+<div class="dropdown-menu">
+<a href="scorecard.html">Scorecard</a>
+<a href="pipeline.html">Pipeline</a>
+</div>
+</div>
+</div>
+</nav>
+</header>
+<main class="content">
+<section class="form-container" id="schedule-interview">
+<h1 class="form-title">Schedule Interview</h1>
+<!-- ALERT -->
+  <div id="alert-container"></div>
+
+  <!-- CASE SELECTION -->
+  <div class="form-section">
+    <div class="grid two-col">
+      <div class="form-field">
+        <select id="case-select" onchange="loadCaseDetails()">
+          <option value="">-- Select Claimant --</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <input type="text" id="case-claim-number" readonly placeholder="Claim Number">
+      </div>
+    </div>
+
+    <div id="case-details" style="display: none;">
+      <div class="grid two-col">
+        <div class="form-field">
+          <input type="text" id="case-client" readonly placeholder="Client">
+        </div>
+        <div class="form-field">
+          <input type="text" id="case-date-opened" readonly placeholder="Date Opened">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INVESTIGATION TYPE & INVESTIGATOR -->
+  <div class="form-section">
+    <div class="grid two-col">
+      <div class="form-field">
+        <select id="investigation-type" onchange="updateInvestigatorList()">
+          <option value="">-- Select Investigation Type --</option>
+          <option value="interview">AOE/COE</option>
+          <option value="interview">Liability</option>
+          <option value="surveillance">Surveillance</option>
+          <option value="interview">Other</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <select id="investigator-select">
+          <option value="">-- Assign Investigator --</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- INTERVIEW DATE/TIME -->
+  <div class="form-section">
+    <div class="grid two-col">
+      <div class="form-field">
+        <label class="field-label" for="interview-date">Interview Date</label>
+        <input type="date" id="interview-date">
+      </div>
+      <div class="form-field">
+        <label class="field-label" for="interview-time">Start Time</label>
+        <input type="time" id="interview-time">
+      </div>
+    </div>
+  </div>
+
+  <!-- INTERVIEW LOCATION -->
+  <h3 class="section-header">Interview Location</h3>
+  <div class="form-section">
+    <div class="grid two-col">
+      <div class="form-field">
+        <input type="text" id="location-name" list="location-suggestions" placeholder="Business Name (e.g., Residence or School)">
+        <datalist id="location-suggestions">
+          <!-- Options will be dynamically loaded -->
+        </datalist>
+      </div>
+      <div class="form-field">
+        <input type="text" id="location-street" placeholder="Street Address">
+      </div>
+    </div>
+
+    <div class="grid three-col">
+      <div class="form-field">
+        <label class="field-label" for="location-city">City</label>
+        <input type="text" id="location-city">
+      </div>
+      <div class="form-field">
+        <label class="field-label" for="location-state">State</label>
+        <select id="location-state">
+          <option value="">State</option>
+          <option value="CA" selected>California</option>
+          <option value="NV">Nevada</option>
+          <option value="AZ">Arizona</option>
+          <option value="OR">Oregon</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label class="field-label" for="location-zip">ZIP Code</label>
+        <input type="text" id="location-zip" maxlength="10">
+      </div>
+    </div>
+  </div>
+
+  <!-- NOTES -->
+  <h3 class="section-header">Additional Information <span class="optional">(optional)</span></h3>
+  <div class="form-section">
+    <div class="form-field">
+      <label class="field-label" for="interview-notes">Interview Notes – Enter any special instructions or notes...</label>
+      <textarea id="interview-notes" rows="4"></textarea>
+    </div>
+  </div>
+
+  <!-- BUTTONS -->
+  <div class="button-container">
+    <button type="button" class="btn btn-primary" id="save-btn" onclick="saveScheduleInterview()">Save Schedule</button>
+    <button type="button" class="btn btn-secondary" id="sync-btn" onclick="syncToSheets()" disabled>Sync to Sheets</button>
+    <button type="button" class="btn btn-secondary" onclick="resetForm()">Clear Form</button>
+    <button type="button" class="btn btn-secondary" onclick="window.location.href='dashboard.html'">Cancel</button>
+  </div>
+
+  <div id="sync-status" class="sync-status"></div>
+
+  <!-- QUICK LINKS -->
+  <div class="quick-links">
+    <strong>Next:</strong>
+    <a href="update.html">Update</a> |
+    <a href="report-submission.html">Report Submission</a> |
+    <a href="billing.html">Billing</a> |
+    <a href="dashboard.html">Dashboard</a>
+  </div>
+</section>
+</main>
+<footer class="site-footer">
+<div class="version-stamp">RDB Case Management v1.3</div>
+</footer>
+<script>
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzp7EWEWddYYqQMfBRcA2eriHkbbvCllS-9IOo-panx2Ve04oJThBxUINCuSN_7DwEzFg/exec';
+let lastSavedInterviewKey = null;
+let lastSavedCaseKey = null;
+
+const investigators = {
+interview: ['Conrad', 'Delores', 'Michael', 'Lisa', 'Jeff'],
+surveillance: ['Freddy', 'Ricardo', 'Alma', 'Manuel', 'Devon', 'Michael', 'Delores']
+};
+
+window.addEventListener('DOMContentLoaded', function() {
+loadActiveCases();
+loadLocationSuggestions();
+});
+
+function loadActiveCases() {
+const caseSelect = document.getElementById('case-select');
+// Clear existing options, keep the default "-- Select Claimant --"
+while (caseSelect.options.length > 1) {
+caseSelect.remove(1);
+}
+
+const activeCases = [];
+
+for (let i = 0; i < localStorage.length; i++) {
+const key = localStorage.key(i);
+if (key.startsWith('case_')) {
+const caseData = JSON.parse(localStorage.getItem(key));
+// Filter to include cases with missing/empty status OR status 'Open'
+if (!caseData.status || caseData.status === 'Open') {
+activeCases.push({
+key: key,
+claimNumber: caseData.claimNumber,
+client: caseData.clientCompany || 'Unknown Client',
+claimant: (caseData.claimantFirst || '') + ' ' + (caseData.claimantLast || ''),
+dateOpened: caseData.assignmentDate || caseData.dateCreated
+});
+}
+}
+}
+
+activeCases.sort((a, b) => (a.claimNumber || '').localeCompare(b.claimNumber || ''));
+
+activeCases.forEach(c => {
+const option = document.createElement('option');
+option.value = c.key;
+option.textContent = `${c.claimNumber} - ${c.client} - ${c.claimant}`;
+caseSelect.appendChild(option);
+});
+}
+
+function loadCaseDetails() {
+const caseKey = document.getElementById('case-select').value;
+if (!caseKey) {
+document.getElementById('case-details').style.display = 'none';
+document.getElementById('alert-container').innerHTML = '';
+document.getElementById('case-claim-number').value = '';
+document.getElementById('case-client').value = '';
+document.getElementById('case-date-opened').value = '';
+return;
+}
+
+const caseData = JSON.parse(localStorage.getItem(caseKey));
+
+document.getElementById('case-claim-number').value = caseData.claimNumber || '';
+document.getElementById('case-client').value = caseData.clientCompany || '';
+document.getElementById('case-date-opened').value =
+caseData.assignmentDate ? new Date(caseData.assignmentDate).toLocaleDateString() : 'N/A';
+document.getElementById('case-details').style.display = 'block';
+
+check48HourRule(caseData);
+}
+
+function businessDaysBetween(startDate, endDate) {
+let count = 0;
+let current = new Date(startDate);
+const end = new Date(endDate);
+// Ensure we don't count the end day if it's the same as start day for single day diff
+if (current.toDateString() === end.toDateString()) {
+const day = current.getDay();
+if (day !== 0 && day !== 6) return 1; // If it's the same day and a business day, count as 1
+return 0; // If same day and not business day, count as 0
+}
+
+while (current <= end) {
+const day = current.getDay();
+if (day !== 0 && day !== 6) count++;
+current.setDate(current.getDate() + 1);
+}
+return count;
+}
+
+function check48HourRule(caseData) {
+const alertContainer = document.getElementById('alert-container');
+if (!caseData.assignmentDate) {
+alertContainer.innerHTML = '';
+return;
+}
+
+const dateOpened = new Date(caseData.assignmentDate);
+const now = new Date();
+const businessDays = businessDaysBetween(dateOpened, now);
+
+if (businessDays >= 2 && !caseData.firstInterviewScheduled) {
+alertContainer.innerHTML = `<div class="alert-box alert-danger">
+⚠️ <strong>48-Hour Rule Violation:</strong> Case opened ${businessDays} business days ago — no interview scheduled.
+</div>`;
+} else if (businessDays >= 1 && !caseData.firstInterviewScheduled) {
+alertContainer.innerHTML = `<div class="alert-box alert-warning">
+⏰ <strong>Approaching Deadline:</strong> Case opened ${businessDays} business day(s) ago. Must schedule within 2 days.
+</div>`;
+} else {
+alertContainer.innerHTML = '';
+}
+}
+
+
+function updateInvestigatorList() {
+const type = document.getElementById('investigation-type').value;
+const investigatorSelect = document.getElementById('investigator-select');
+investigatorSelect.innerHTML = '<option value="">-- Assign Investigator --</option>'; // Updated placeholder
+if (type) {
+const list = investigators[type] || [];
+list.forEach(inv => {
+const option = document.createElement('option');
+option.value = inv;
+option.textContent = inv;
+investigatorSelect.appendChild(option);
+});
+}
+}
+
+function loadLocationSuggestions() {
+const datalist = document.getElementById('location-suggestions');
+// Clear existing options
+datalist.innerHTML = '';
+
+const locations = new Set();
+for (let i = 0; i < localStorage.length; i++) {
+const key = localStorage.key(i);
+if (key.startsWith('interview_')) {
+const interview = JSON.parse(localStorage.getItem(key));
+if (interview.locationName) locations.add(interview.locationName);
+}
+}
+
+// Always include "Residence" if not already present
+if (!locations.has('Residence')) {
+locations.add('Residence');
+}
+
+Array.from(locations).sort().forEach(loc => { // Sort alphabetically
+const option = document.createElement('option');
+option.value = loc;
+datalist.appendChild(option);
+});
+}
+
+
+function saveScheduleInterview() {
+const caseKey = document.getElementById('case-select').value;
+const investigationType = document.getElementById('investigation-type').value;
+const investigator = document.getElementById('investigator-select').value;
+const interviewDate = document.getElementById('interview-date').value;
+const interviewTime = document.getElementById('interview-time').value;
+const locationName = document.getElementById('location-name').value;
+
+if (!caseKey || !investigationType || !investigator || !interviewDate || !locationName) {
+alert('Please fill all required fields before saving.');
+return;
+}
+
+const caseData = JSON.parse(localStorage.getItem(caseKey));
+const isFirstInterview = !caseData.firstInterviewScheduled;
+
+const interviewData = {
+caseKey: caseKey,
+claimNumber: caseData.claimNumber,
+investigationType,
+investigator,
+interviewDate,
+interviewTime,
+locationName,
+locationStreet: document.getElementById('location-street').value,
+locationCity: document.getElementById('location-city').value,
+locationState: document.getElementById('location-state').value,
+locationZip: document.getElementById('location-zip').value,
+notes: document.getElementById('interview-notes').value,
+dateScheduled: new Date().toISOString(),
+isFirstInterview
+};
+
+const interviewId = 'interview_' + Date.now();
+localStorage.setItem(interviewId, JSON.stringify(interviewData));
+lastSavedInterviewKey = interviewId;
+
+caseData.status = 'Scheduled';
+caseData.investigatorAssigned = investigator;
+caseData.dateAssignedToInvestigator = new Date().toISOString();
+
+if (isFirstInterview) {
+caseData.firstInterviewScheduled = true;
+caseData.firstInterviewDate = interviewDate;
+caseData.firstInterviewId = interviewId;
+}
+
+localStorage.setItem(caseKey, JSON.stringify(caseData));
+lastSavedCaseKey = caseKey;
+
+document.getElementById('sync-btn').disabled = false;
+document.getElementById('sync-status').innerHTML = '<span style="color: var(--warning);">⚠️ Not synced to Sheets yet</span>';
+alert('Interview scheduled and saved locally.\n\nClick "Sync to Sheets" to back up.');
+}
+
+async function syncToSheets() {
+if (!lastSavedInterviewKey || !lastSavedCaseKey) {
+alert('Please save before syncing.');
+return;
+}
+const syncBtn = document.getElementById('sync-btn');
+const syncStatus = document.getElementById('sync-status');
+syncBtn.disabled = true;
+syncBtn.textContent = 'Syncing...';
+syncStatus.innerHTML = '<span style="color: var(--accent);">⏳ Syncing to Google Sheets...</span>';
+
+try {
+const interviewData = JSON.parse(localStorage.getItem(lastSavedInterviewKey));
+const caseData = JSON.parse(localStorage.getItem(lastSavedCaseKey));
+
+await fetch(WEB_APP_URL, {
+method: 'POST',
+mode: 'no-cors',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ action: 'syncInterview', interviewData })
+});
+
+await fetch(WEB_APP_URL, {
+method: 'POST',
+mode: 'no-cors',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ action: 'syncCase', caseData })
+});
+
+syncStatus.innerHTML = `<span style="color: var(--success);">✅ Synced successfully (${new Date().toLocaleTimeString()})</span>`;
+} catch (error) {
+syncStatus.innerHTML = `<span style="color: var(--danger);">❌ Sync failed: ${error.message}</span>`;
+} finally {
+syncBtn.textContent = 'Sync to Sheets';
+syncBtn.disabled = false;
+}
+}
+
+function resetForm() {
+document.getElementById('case-select').value = '';
+document.getElementById('investigation-type').value = '';
+document.getElementById('investigator-select').innerHTML = '<option value="">-- Assign Investigator --</option>'; // Updated placeholder
+document.getElementById('interview-date').value = '';
+document.getElementById('interview-time').value = '';
+document.getElementById('location-name').value = '';
+document.getElementById('location-street').value = '';
+document.getElementById('location-city').value = '';
+document.getElementById('location-state').value = 'CA'; // Default state remains CA
+document.getElementById('location-zip').value = '';
+document.getElementById('interview-notes').value = '';
+document.getElementById('case-details').style.display = 'none';
+document.getElementById('alert-container').innerHTML = '';
+document.getElementById('sync-btn').disabled = true;
+document.getElementById('sync-status').innerHTML = '';
+lastSavedInterviewKey = null;
+lastSavedCaseKey = null;
+loadActiveCases(); // Reload active cases to reset dropdown content
+loadLocationSuggestions(); // Reload location suggestions
+}
+</script>
+</body>
+</html>

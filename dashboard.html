@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard - RDB Case Management</title>
+  <link rel="stylesheet" href="charcoal.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-title">Dashboard</div>
+    <nav class="site-nav">
+      <div class="menu-group">
+        <button class="btn btn-primary" onclick="refreshDashboard()">↻ Refresh</button>
+        <div class="dropdown">
+          <button class="btn">Forms ▾</button>
+          <div class="dropdown-menu">
+            <a href="intake.html">Intake</a>
+            <a href="schedule-interview.html">Schedule Interview</a>
+            <a href="update.html">Update</a>
+            <a href="report-submission.html">Report Submission</a>
+            <a href="billing.html">Billing</a>
+          </div>
+        </div>
+        <div class="dropdown">
+          <button class="btn">Reports ▾</button>
+          <div class="dropdown-menu">
+            <a href="scorecard.html">Scorecard</a>
+            <a href="pipeline.html">Pipeline</a>
+          </div>
+        </div>
+      </div>
+    </nav>
+  </header>
+  <main class="content">
+    <h1 class="form-title">Case Management Dashboard</h1>
+    <div class="dashboard-grid">
+      <div class="metric-box" onclick="showDrillDown('newCases')">
+        <div class="metric-number" id="metric-new-cases">0</div>
+        <div class="metric-label">New Cases</div>
+        <div class="metric-sublabel">Today</div>
+      </div>
+      <div class="metric-box" onclick="showDrillDown('scheduled')">
+        <div class="metric-number" id="metric-scheduled">0</div>
+        <div class="metric-label">Scheduled Cases</div>
+        <div class="metric-sublabel">Today</div>
+      </div>
+      <div class="metric-box" onclick="showDrillDown('completed')">
+        <div class="metric-number" id="metric-completed">0</div>
+        <div class="metric-label">Completed Cases</div>
+        <div class="metric-sublabel">Today</div>
+      </div>
+      <div class="metric-box" onclick="showDrillDown('turnaround')">
+        <div class="metric-number" id="metric-turnaround">--</div>
+        <div class="metric-label">Avg Turnaround</div>
+        <div class="metric-sublabel">Days</div>
+      </div>
+      <div class="metric-box" onclick="showDrillDown('billed')">
+        <div class="metric-number" id="metric-billed">0</div>
+        <div class="metric-label">Cases Billed</div>
+        <div class="metric-sublabel">Today</div>
+      </div>
+      <div class="metric-box" onclick="showDrillDown('totalBilled')">
+        <div class="metric-number" id="metric-total-billed">$0</div>
+        <div class="metric-label">Total Billed</div>
+        <div class="metric-sublabel">Today</div>
+      </div>
+      <div class="metric-box" id="box-interviews" onclick="showDrillDown('interviewsNeeded')">
+        <div class="metric-number" id="metric-interviews">0</div>
+        <div class="metric-label">Interviews Needed</div>
+        <div class="metric-sublabel">48-Hour Rule</div>
+      </div>
+      <div class="metric-box" id="box-reports" onclick="showDrillDown('reportsOverdue')">
+        <div class="metric-number" id="metric-reports">0</div>
+        <div class="metric-label">Reports Overdue</div>
+        <div class="metric-sublabel">24-Hour Rule</div>
+      </div>
+      <div class="metric-box" id="box-weekly" onclick="showDrillDown('weeklyBilling')">
+        <div class="metric-number" id="metric-weekly-amount">$0</div>
+        <div class="metric-label">Weekly Billing</div>
+        <div class="metric-sublabel" id="weekly-sublabel">$0 / $12K</div>
+        <div class="progress-bar-container">
+          <div class="progress-bar" id="weekly-progress" style="width: 0%"></div>
+        </div>
+      </div>
+      <div class="metric-box" onclick="showDrillDown('readyToBill')">
+        <div class="metric-number" id="metric-ready">0</div>
+        <div class="metric-label">Ready to Bill</div>
+        <div class="metric-sublabel">Completed Cases</div>
+      </div>
+      <div class="metric-box" id="box-stuck" onclick="showDrillDown('stuck')">
+        <div class="metric-number" id="metric-stuck">0</div>
+        <div class="metric-label">Cases Stuck</div>
+        <div class="metric-sublabel">7+ Days No Action</div>
+      </div>
+      <div class="metric-box" id="box-flagged" onclick="showDrillDown('flagged')">
+        <div class="metric-number" id="metric-flagged">0</div>
+        <div class="metric-label">Flagged Items</div>
+        <div class="metric-sublabel">Needs Attention</div>
+      </div>
+    </div>
+    <div class="last-updated">Last updated: <span id="last-update-time">--</span></div>
+  </main>
+  <footer class="site-footer">
+    <div class="version-stamp">RDB Case Management v1.3</div>
+    <div class="footer-links">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="scorecard.html">Scorecard</a>
+      <a href="pipeline.html">Pipeline</a>
+    </div>
+  </footer>
+  <div class="modal-overlay" id="modal" onclick="closeModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title" id="modal-title">Cases</div>
+        <button class="modal-close" onclick="closeModal()">×</button>
+      </div>
+      <div class="case-list" id="modal-body"></div>
+    </div>
+  </div>
+  <script>
+    let dashboardData = {};
+    window.addEventListener('DOMContentLoaded', function() { loadDashboard(); setInterval(loadDashboard, 300000); });
+    function loadDashboard() {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      dashboardData = { newCases: [], scheduled: [], completed: [], turnaroundCases: [], billed: [], totalBilledAmount: 0, interviewsNeeded: [], reportsOverdue: [], weeklyBilling: [], readyToBill: [], stuck: [], flagged: [] };
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key.startsWith('case_')) {
+          const caseData = JSON.parse(localStorage.getItem(key)); caseData._key = key;
+          const assignDate = caseData.assignmentDate ? new Date(caseData.assignmentDate) : null; assignDate?.setHours(0, 0, 0, 0);
+          if (assignDate && assignDate.getTime() === today.getTime()) dashboardData.newCases.push(caseData);
+          if (caseData.firstInterviewScheduled && caseData.firstInterviewDate) {
+            const schedDate = new Date(caseData.dateAssignedToInvestigator || caseData.firstInterviewDate); schedDate.setHours(0, 0, 0, 0);
+            if (schedDate.getTime() === today.getTime()) dashboardData.scheduled.push(caseData);
+          }
+          if (caseData.dateCompleted) {
+            const compDate = new Date(caseData.dateCompleted); compDate.setHours(0, 0, 0, 0);
+            if (compDate.getTime() === today.getTime()) {
+              dashboardData.completed.push(caseData);
+              const openDate = new Date(caseData.assignmentDate || caseData.dateCreated);
+              const turnaround = Math.floor((new Date(caseData.dateCompleted) - openDate) / 86400000);
+              dashboardData.turnaroundCases.push({...caseData, turnaround});
+            }
+          }
+          if (caseData.status === 'Open' && !caseData.firstInterviewScheduled) {
+            const openDate = new Date(caseData.assignmentDate || caseData.dateCreated);
+            const hoursSince = (Date.now() - openDate) / 3600000;
+            if (hoursSince >= 24) dashboardData.interviewsNeeded.push({...caseData, hoursSince, urgency: hoursSince >= 48 ? 'urgent' : 'warning'});
+          }
+          if (caseData.status === 'Scheduled' || caseData.firstInterviewDate) {
+            const lastInterviewDate = caseData.firstInterviewDate ? new Date(caseData.firstInterviewDate) : null;
+            if (lastInterviewDate && !caseData.dateCompleted) {
+              const hoursSince = (Date.now() - lastInterviewDate) / 3600000;
+              if (hoursSince > 24) dashboardData.reportsOverdue.push({...caseData, hoursSince, severity: hoursSince > 48 ? 'critical' : 'overdue'});
+            }
+          }
+          if (caseData.status === 'Completed' && caseData.status !== 'Billed') dashboardData.readyToBill.push(caseData);
+          if (caseData.lastUpdate && caseData.status !== 'Billed') {
+            const lastUpdate = new Date(caseData.lastUpdate);
+            const daysSince = Math.floor((Date.now() - lastUpdate) / 86400000);
+            if (daysSince > 7) dashboardData.stuck.push({...caseData, daysSince});
+          }
+        }
+        if (key.startsWith('billing_')) {
+          const billingData = JSON.parse(localStorage.getItem(key));
+          const billDate = new Date(billingData.billingDate); billDate.setHours(0, 0, 0, 0);
+          if (billDate.getTime() === today.getTime()) {
+            dashboardData.billed.push(billingData);
+            dashboardData.totalBilledAmount += parseFloat(billingData.billingAmount) || 0;
+          }
+          const weekStart = getWeekStart(new Date());
+          const billDateTime = new Date(billingData.billingDate);
+          if (billDateTime >= weekStart) dashboardData.weeklyBilling.push(billingData);
+        }
+      }
+      updateMetrics(); updateLastUpdateTime();
+    }
+    function getWeekStart(date) {
+      const d = new Date(date); const day = d.getDay(); const diff = d.getDate() - day;
+      const weekStart = new Date(d.setDate(diff)); weekStart.setHours(0, 0, 0, 0); return weekStart;
+    }
+    function updateMetrics() {
+      document.getElementById('metric-new-cases').textContent = dashboardData.newCases.length;
+      document.getElementById('metric-scheduled').textContent = dashboardData.scheduled.length;
+      document.getElementById('metric-completed').textContent = dashboardData.completed.length;
+      if (dashboardData.turnaroundCases.length > 0) {
+        const avgTurnaround = Math.round(dashboardData.turnaroundCases.reduce((sum, c) => sum + c.turnaround, 0) / dashboardData.turnaroundCases.length);
+        document.getElementById('metric-turnaround').textContent = avgTurnaround;
+      } else document.getElementById('metric-turnaround').textContent = '--';
+      document.getElementById('metric-billed').textContent = dashboardData.billed.length;
+      document.getElementById('metric-total-billed').textContent = '$' + dashboardData.totalBilledAmount.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+      const interviewCount = dashboardData.interviewsNeeded.length;
+      document.getElementById('metric-interviews').textContent = interviewCount;
+      const boxInterviews = document.getElementById('box-interviews'); boxInterviews.className = 'metric-box';
+      if (interviewCount > 0) {
+        const hasUrgent = dashboardData.interviewsNeeded.some(c => c.urgency === 'urgent');
+        boxInterviews.classList.add(hasUrgent ? 'alert-red' : 'alert-yellow');
+      }
+      const reportsCount = dashboardData.reportsOverdue.length;
+      document.getElementById('metric-reports').textContent = reportsCount;
+      const boxReports = document.getElementById('box-reports'); boxReports.className = 'metric-box';
+      if (reportsCount > 0) boxReports.classList.add('alert-red');
+      const weeklyTotal = dashboardData.weeklyBilling.reduce((sum, b) => sum + parseFloat(b.billingAmount || 0), 0);
+      const weeklyGoal = 12000; const weeklyPercent = (weeklyTotal / weeklyGoal) * 100;
+      document.getElementById('metric-weekly-amount').textContent = '$' + weeklyTotal.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+      document.getElementById('weekly-sublabel').textContent = '$' + weeklyTotal.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0}) + ' / $12K';
+      const progressBar = document.getElementById('weekly-progress'); progressBar.style.width = Math.min(weeklyPercent, 100) + '%';
+      progressBar.className = 'progress-bar';
+      if (weeklyPercent >= 100) progressBar.classList.add('green');
+      else if (weeklyPercent >= 70) progressBar.classList.add('yellow');
+      else progressBar.classList.add('red');
+      const boxWeekly = document.getElementById('box-weekly'); boxWeekly.className = 'metric-box';
+      if (weeklyPercent >= 100) boxWeekly.classList.add('alert-green');
+      else if (weeklyPercent >= 70) boxWeekly.classList.add('alert-yellow');
+      else boxWeekly.classList.add('alert-red');
+      document.getElementById('metric-ready').textContent = dashboardData.readyToBill.length;
+      const stuckCount = dashboardData.stuck.length;
+      document.getElementById('metric-stuck').textContent = stuckCount;
+      const boxStuck = document.getElementById('box-stuck'); boxStuck.className = 'metric-box';
+      if (stuckCount > 0) boxStuck.classList.add('alert-red');
+      document.getElementById('metric-flagged').textContent = dashboardData.flagged.length;
+      const boxFlagged = document.getElementById('box-flagged'); boxFlagged.className = 'metric-box';
+      if (dashboardData.flagged.length > 0) boxFlagged.classList.add('alert-red');
+    }
+    function showDrillDown(metric) { alert('Drill-down modal coming soon'); }
+    function closeModal(event) { if (!event || event.target.id === 'modal') document.getElementById('modal').classList.remove('active'); }
+    function refreshDashboard() { loadDashboard(); }
+    function updateLastUpdateTime() { document.getElementById('last-update-time').textContent = new Date().toLocaleTimeString(); }
+  </script>
+</body>
+</html>

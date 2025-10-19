@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Case Update Form</title>
+<link rel="stylesheet" href="charcoal.css">
+<script src="sync.js"></script>
+</head>
+<body>
+<header class="site-header">
+<div class="site-title">Case Update Form</div>
+<nav class="site-nav">
+<div class="menu-group">
+<button class="btn btn-primary" onclick="location.href='dashboard.html'">Dashboard</button>
+<div class="dropdown">
+<button class="btn">Forms ▾</button>
+<div class="dropdown-menu">
+<a href="intake.html">Intake</a>
+<a href="schedule-interview.html">Schedule Interview</a>
+<a href="update.html">Update</a>
+<a href="report-submission.html">Report Submission</a>
+<a href="billing.html">Billing</a>
+</div>
+</div>
+<div class="dropdown">
+<button class="btn">Reports ▾</button>
+<div class="dropdown-menu">
+<a href="scorecard.html">Scorecard</a>
+<a href="pipeline.html">Pipeline</a>
+</div>
+</div>
+</div>
+</nav>
+</header>
+<main class="content">
+<section class="form-container" id="update-form">
+<h1 class="form-title">Case Update Form</h1>
+<!-- CLAIMANT LOOKUP SECTION -->
+<h3 class="section-header">Select Case</h3>
+<section class="form-section" id="claimant-lookup">
+<div class="grid two-col">
+<div class="form-field">
+<select id="claimant-name" onchange="handleClaimantChange()">
+<option value="">Select Claimant</option>
+</select>
+</div>
+<div class="form-field">
+<select id="claim-number" onchange="loadCaseDetails()">
+<option value="">Claim Number</option>
+</select>
+</div>
+</div>
+</section>
+<h3 class="section-header">Case Update Details</h3>
+<section class="form-section" id="update-section">
+<div id="case-details" style="display: none;">
+<div class="grid two-col">
+<div class="form-field">
+<input type="text" id="display-claim-number" placeholder="Claim Number" readonly>
+</div>
+<div class="form-field">
+<input type="text" id="display-client" placeholder="Client" readonly>
+</div>
+</div>
+<div class="grid two-col">
+    <div class="form-field">
+      <input type="text" id="display-claimant" placeholder="Claimant" readonly>
+    </div>
+    <div class="form-field">
+      <input type="text" id="display-status" placeholder="Status" readonly>
+    </div>
+  </div>
+
+  <div class="grid two-col">
+    <div class="form-field">
+      <input type="text" id="display-last-update" placeholder="Last Update" readonly>
+    </div>
+    <div class="form-field">
+      <input type="text" id="display-last-action" placeholder="Last Action" readonly>
+    </div>
+  </div>
+
+  <div class="form-field">
+    <input type="text" id="display-investigator" placeholder="Investigator Assigned" readonly>
+  </div>
+
+  <div class="form-field">
+    <textarea id="action-taken" rows="2" placeholder="Action Taken (required) - Describe what was done"></textarea>
+  </div>
+
+  <div class="form-field">
+    <textarea id="next-steps" rows="2" placeholder="Next Steps (required) - What needs to happen next"></textarea>
+  </div>
+
+  <div class="form-field">
+    <textarea id="notes" rows="2" placeholder="Notes (optional) - Any additional context or information"></textarea>
+  </div>
+
+  <div class="grid two-col">
+    <div class="form-field">
+      <label for="interview-date" class="field-label">Interview Date (if applicable):</label>
+      <input type="date" id="interview-date">
+    </div>
+    <div class="form-field">
+      <label for="status-update" class="field-label">Update Case Status:</label>
+      <select id="status-update">
+        <option value="">No Change</option>
+        <option value="Open">Open</option>
+        <option value="Scheduled">Scheduled</option>
+        <option value="In Progress">In Progress</option>
+        <option value="Completed">Completed</option>
+        <option value="Verify Documents">Verify Documents</option>
+        <option value="Billed">Billed</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-field">
+    <input type="text" id="due-date" placeholder="Next Update Due By (auto-calculated)" readonly>
+  </div>
+</div>
+</section>
+<!-- BUTTONS -->
+<div class="button-container">
+<button type="button" class="btn btn-primary" onclick="saveUpdate()">Save</button>
+<button type="button" class="btn btn-secondary" id="sync-btn" onclick="syncToSheets()" disabled>Sync to Sheets</button>
+<button type="button" class="btn btn-secondary" onclick="clearForm()">Clear Form</button>
+<button type="button" class="btn btn-secondary" onclick="window.location.href='dashboard.html'">Cancel</button>
+</div>
+<div id="sync-status" class="sync-status"></div>
+<!-- QUICK LINKS FOOTER -->
+<div class="quick-links">
+<strong>Next:</strong>
+<a href="report-submission.html">Report Submission</a> |
+<a href="billing.html">Billing</a> |
+<a href="dashboard.html">Dashboard</a>
+</div>
+</section>
+</main>
+<footer class="site-footer">
+<div class="version-stamp">RDB Case Management v1.3</div>
+</footer>
+<script>
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzp7EWEWddYYqQMfBRcA2eriHkbbvCllS-9IOo-panx2Ve04oJThBxUINCuSN_7DwEzFg/exec';
+let selectedCaseKey = null;
+let lastSavedUpdateKey = null;
+let lastSavedCaseKey = null;
+document.addEventListener('DOMContentLoaded', function() {
+populateClaimantDropdown();
+calculateDueDate(); // Ensure this runs even if no case is selected initially to set the placeholder
+});
+function populateClaimantDropdown() {
+const claimantSelect = document.getElementById('claimant-name');
+const claimantsMap = new Map();
+claimantSelect.innerHTML = '<option value="">Select Claimant</option>'; // Clear existing options
+for (let i = 0; i < localStorage.length; i++) {
+const key = localStorage.key(i);
+if (key.startsWith('case_')) {
+try {
+const data = JSON.parse(localStorage.getItem(key));
+// Filter to EXCLUDE only 'Billed' cases
+if (data.status !== 'Billed') {
+const fullName = (data.claimantFirst || '') + ' ' + (data.claimantLast || '');
+if (fullName.trim()) {
+if (!claimantsMap.has(fullName)) {
+claimantsMap.set(fullName, []);
+}
+claimantsMap.get(fullName).push({
+claimNumber: data.claimNumber,
+caseKey: key
+});
+}
+}
+} catch (e) {
+console.error('Error parsing case from localStorage:', key, e);
+}
+}
+}
+// Sort claimants by name
+const sortedClaimantNames = Array.from(claimantsMap.keys()).sort();
+sortedClaimantNames.forEach(claimantName => {
+const option = document.createElement('option');
+option.value = claimantName;
+option.textContent = claimantName;
+claimantSelect.appendChild(option);
+});
+}
+function handleClaimantChange() {
+const claimantName = document.getElementById('claimant-name').value;
+const claimNumberSelect = document.getElementById('claim-number');
+claimNumberSelect.innerHTML = '<option value="">Claim Number</option>';
+selectedCaseKey = null; // Clear selected case when claimant changes
+document.getElementById('case-details').style.display = 'none'; // Hide details until a claim is selected
+clearFormFields(); // Clear the detailed form fields
+if (!claimantName) {
+return;
+}
+const casesForClaimant = [];
+for (let i = 0; i < localStorage.length; i++) {
+const key = localStorage.key(i);
+if (key.startsWith('case_')) {
+try {
+const data = JSON.parse(localStorage.getItem(key));
+// Filter to EXCLUDE only 'Billed' cases
+if (data.status !== 'Billed') {
+const fullName = (data.claimantFirst || '') + ' ' + (data.claimantLast || '');
+if (fullName === claimantName && data.claimNumber) {
+casesForClaimant.push({
+claimNumber: data.claimNumber,
+caseKey: key
+});
+}
+}
+} catch (e) {
+console.error('Error parsing case from localStorage during claimant change:', key, e);
+}
+}
+}
+// Sort cases by claim number
+casesForClaimant.sort((a, b) => a.claimNumber.localeCompare(b.claimNumber));
+if (casesForClaimant.length === 1) {
+const option = document.createElement('option');
+option.value = casesForClaimant[0].caseKey;
+option.textContent = casesForClaimant[0].claimNumber;
+option.selected = true;
+claimNumberSelect.appendChild(option);
+loadCaseDetails(); // Automatically load if only one case
+} else if (casesForClaimant.length > 1) {
+casesForClaimant.forEach(caseInfo => {
+const option = document.createElement('option');
+option.value = caseInfo.caseKey;
+option.textContent = caseInfo.claimNumber;
+claimNumberSelect.appendChild(option);
+});
+}
+}
+function loadCaseDetails() {
+const claimNumberSelect = document.getElementById('claim-number');
+selectedCaseKey = claimNumberSelect.value;
+if (!selectedCaseKey) {
+document.getElementById('case-details').style.display = 'none';
+clearFormFields();
+return;
+}
+const caseData = JSON.parse(localStorage.getItem(selectedCaseKey));
+if (caseData) {
+document.getElementById('case-details').style.display = 'block';
+document.getElementById('display-claim-number').value = caseData.claimNumber || 'N/A';
+document.getElementById('display-client').value = caseData.clientCompany || 'N/A';
+document.getElementById('display-claimant').value =
+(caseData.claimantFirst || '') + ' ' + (caseData.claimantLast || '');
+document.getElementById('display-status').value = caseData.status || 'Open';
+const lastUpdateDate = caseData.lastUpdate ? new Date(caseData.lastUpdate).toLocaleDateString() : 'No updates yet';
+document.getElementById('display-last-update').value = lastUpdateDate;
+document.getElementById('display-last-action').value = caseData.lastAction || 'No actions recorded';
+let investigator = 'Not assigned';
+if (caseData.investigatorAssigned) {
+investigator = caseData.investigatorAssigned;
+}
+document.getElementById('display-investigator').value = investigator;
+// Populate existing update fields if present for this case, otherwise clear them
+// This is a new logic based on the original update form's behavior.
+const currentUpdateRecord = caseData.updateHistory && caseData.updateHistory.length > 0
+? JSON.parse(localStorage.getItem(caseData.updateHistory[caseData.updateHistory.length - 1]))
+: null;
+document.getElementById('action-taken').value = currentUpdateRecord ? currentUpdateRecord.actionTaken || '' : '';
+document.getElementById('next-steps').value = currentUpdateRecord ? currentUpdateRecord.nextSteps || '' : '';
+document.getElementById('notes').value = currentUpdateRecord ? currentUpdateRecord.notes || '' : '';
+document.getElementById('interview-date').value = currentUpdateRecord ? currentUpdateRecord.interviewDate || '' : '';
+document.getElementById('status-update').value = caseData.status || ''; // Set status dropdown to current case status
+calculateDueDate(); // Recalculate based on current date, not last update
+} else {
+alert('Case details not found for the selected claim number.');
+document.getElementById('case-details').style.display = 'none';
+clearFormFields();
+}
+}
+function calculateDueDate() {
+const today = new Date();
+const dueDate = new Date(today);
+dueDate.setDate(dueDate.getDate() + 7);
+const formattedDate = dueDate.toLocaleDateString('en-CA'); // YYYY-MM-DD for consistency
+document.getElementById('due-date').value = ${formattedDate} (7 days from today);
+}
+function saveUpdate() {
+if (!selectedCaseKey) {
+alert('Please select a case before saving the update.');
+return;
+}
+const actionTaken = document.getElementById('action-taken').value.trim();
+const nextSteps = document.getElementById('next-steps').value.trim();
+if (!actionTaken) {
+alert('Please fill in "Action Taken" before saving.');
+return;
+}
+if (!nextSteps) {
+alert('Please fill in "Next Steps" before saving.');
+return;
+}
+const caseData = JSON.parse(localStorage.getItem(selectedCaseKey));
+const statusBefore = caseData.status || 'Open';
+const newStatus = document.getElementById('status-update').value;
+const timestamp = Date.now();
+const updateKey = 'update_' + timestamp;
+const updateRecord = {
+caseKey: selectedCaseKey,
+claimNumber: caseData.claimNumber || 'N/A',
+actionTaken: actionTaken,
+nextSteps: nextSteps,
+notes: document.getElementById('notes').value.trim() || null,
+interviewDate: document.getElementById('interview-date').value || null,
+updateDate: new Date().toISOString(),
+updatedBy: 'Conrad', // Hardcoded as per original
+statusBefore: statusBefore,
+statusAfter: newStatus || statusBefore
+};
+localStorage.setItem(updateKey, JSON.stringify(updateRecord));
+lastSavedUpdateKey = updateKey;
+caseData.lastAction = actionTaken;
+caseData.lastUpdate = new Date().toISOString();
+const dueDate = new Date();
+dueDate.setDate(dueDate.getDate() + 7);
+caseData.updateDueDate = dueDate.toISOString();
+if (newStatus) {
+caseData.status = newStatus;
+caseData.statusChangeDate = new Date().toISOString();
+}
+if (!caseData.updateHistory) {
+caseData.updateHistory = [];
+}
+caseData.updateHistory.push(updateKey);
+localStorage.setItem(selectedCaseKey, JSON.stringify(caseData));
+lastSavedCaseKey = selectedCaseKey;
+document.getElementById('sync-btn').disabled = false;
+document.getElementById('sync-status').innerHTML = '<span class="warning-text">⚠️ Not synced to Sheets yet</span>';
+const dueDateFormatted = new Date(caseData.updateDueDate).toLocaleDateString('en-CA');
+const caseName = ${caseData.claimNumber} - ${caseData.clientCompany};
+const currentStatus = caseData.status;
+alert(Update saved to localStorage!\n\nCase: ${caseName}\nStatus: ${currentStatus}\nNext update due by: ${dueDateFormatted}\n\nClick "Sync to Sheets" to backup to Google Sheets.);
+// After saving, re-populate dropdowns to reflect potential status changes
+populateClaimantDropdown();
+document.getElementById('claimant-name').value = ''; // Clear claimant dropdown
+document.getElementById('claim-number').innerHTML = '<option value="">Claim Number</option>'; // Clear claim number dropdown
+document.getElementById('case-details').style.display = 'none'; // Hide details
+clearFormFields(); // Clear form inputs
+selectedCaseKey = null; // Reset selected case
+calculateDueDate(); // Recalculate for the next potential entry
+}
+async function syncToSheets() {
+if (!lastSavedUpdateKey || !lastSavedCaseKey) {
+alert('Please save the update first before syncing.');
+return;
+}
+const syncBtn = document.getElementById('sync-btn');
+const syncStatus = document.getElementById('sync-status');
+syncBtn.disabled = true;
+syncBtn.textContent = 'Syncing...';
+syncStatus.innerHTML = '<span class="accent-text">⏳ Syncing to Google Sheets...</span>';
+try {
+const updateData = JSON.parse(localStorage.getItem(lastSavedUpdateKey));
+const caseData = JSON.parse(localStorage.getItem(lastSavedCaseKey));
+await fetch(WEB_APP_URL, {
+method: 'POST',
+mode: 'no-cors',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({
+action: 'syncUpdate',
+updateData: updateData
+})
+});
+await fetch(WEB_APP_URL, {
+method: 'POST',
+mode: 'no-cors',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({
+action: 'syncCase',
+caseData: caseData
+})
+});
+syncStatus.innerHTML = '<span class="success-text">✅ Synced to Google Sheets! (Last synced: ' + new Date().toLocaleTimeString() + ')</span>';
+syncBtn.textContent = 'Sync to Sheets';
+syncBtn.disabled = false;
+} catch (error) {
+console.error('Sync error:', error);
+syncStatus.innerHTML = '<span class="danger-text">❌ Sync failed: ' + error.message + '</span>';
+syncBtn.textContent = 'Retry Sync';
+syncBtn.disabled = false;
+}
+}
+function clearFormFields() {
+// Clear display fields
+document.getElementById('display-claim-number').value = '';
+document.getElementById('display-client').value = '';
+document.getElementById('display-claimant').value = '';
+document.getElementById('display-status').value = '';
+document.getElementById('display-last-update').value = '';
+document.getElementById('display-last-action').value = '';
+document.getElementById('display-investigator').value = '';
+// Clear input fields
+document.getElementById('action-taken').value = '';
+document.getElementById('next-steps').value = '';
+document.getElementById('notes').value = '';
+document.getElementById('interview-date').value = '';
+document.getElementById('status-update').value = '';
+calculateDueDate(); // Reset due date to 7 days from today
+document.getElementById('sync-btn').disabled = true; // Disable sync button
+document.getElementById('sync-status').textContent = ''; // Clear sync status
+}
+function clearForm() {
+// This function will clear everything, including claimant/claim number selection
+document.getElementById('claimant-name').value = '';
+document.getElementById('claim-number').innerHTML = '<option value="">Claim Number</option>';
+document.getElementById('case-details').style.display = 'none';
+clearFormFields();
+selectedCaseKey = null;
+lastSavedUpdateKey = null;
+lastSavedCaseKey = null;
+populateClaimantDropdown(); // Re-populate dropdowns
+}
+</script>
+</body>
+</html>

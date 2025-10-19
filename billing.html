@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Billing</title>
+<link rel="stylesheet" href="charcoal.css">
+</head>
+<body>
+<header class="site-header">
+<div class="site-title">Billing</div>
+<nav class="site-nav">
+<div class="menu-group">
+<button class="btn btn-primary" onclick="window.location.href='dashboard.html'">Dashboard</button>
+<div class="dropdown">
+<button class="btn">Forms ▾</button>
+<div class="dropdown-menu">
+<a href="intake.html">Intake</a>
+<a href="schedule-interview.html">Schedule Interview</a>
+<a href="update.html">Update</a>
+<a href="report-submission.html">Report Submission</a>
+<a href="billing.html">Billing</a>
+</div>
+</div>
+<div class="dropdown">
+<button class="btn">Reports ▾</button>
+<div class="dropdown-menu">
+<a href="scorecard.html">Scorecard</a>
+<a href="pipeline.html">Pipeline</a>
+</div>
+</div>
+</div>
+</nav>
+</header>
+<main class="content">
+<section class="form-container" id="billing-form">
+<h1 class="form-title">Billing</h1>
+<!-- WEEKLY TRACKER -->
+  <div class="weekly-tracker">
+    <div class="tracker-header">Weekly Billing Progress</div>
+    <div class="tracker-row">
+      <span>This Week:</span>
+      <span class="tracker-amount" id="week-total">$0.00</span>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progress-fill" style="width: 0%;">0%</div>
+    </div>
+    <div class="tracker-row">
+      <span>Goal: $12,000.00</span>
+      <span id="remaining-amount">Remaining: $12,000.00</span>
+    </div>
+    <div class="tracker-row">
+      <span>Cases Billed This Week: <strong id="cases-count">0</strong></span>
+      <span>Average per Case: <strong id="avg-amount">$0.00</strong></span>
+    </div>
+  </div>
+
+  <!-- CASE INFORMATION -->
+  <h3 class="section-header">Case Information</h3>
+  <section class="form-section">
+    <div class="form-field">
+      <select id="case-select" onchange="loadCaseDetails()">
+        <option value="">Select Case to Bill</option>
+      </select>
+    </div>
+
+    <div id="case-details" style="display: none;">
+      <div class="grid two-col">
+        <div class="form-field">
+          <input type="text" id="claim-number" placeholder="Claim Number" readonly>
+        </div>
+        <div class="form-field">
+          <input type="text" id="case-name" placeholder="Case Name" readonly>
+        </div>
+      </div>
+      <div class="grid two-col">
+        <div class="form-field">
+          <input type="text" id="client-company" placeholder="Client Company" readonly>
+        </div>
+        <div class="form-field">
+          <input type="text" id="claimant-name" placeholder="Claimant Name" readonly>
+        </div>
+      </div>
+      <div class="grid two-col">
+        <div class="form-field">
+          <input type="text" id="date-opened" placeholder="Date Case Opened" readonly>
+        </div>
+        <div class="form-field">
+          <input type="text" id="date-completed" placeholder="Date Completed" readonly>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BILLING DETAILS -->
+  <h3 class="section-header">Billing Details</h3>
+  <section class="form-section">
+    <div class="grid two-col">
+      <div class="form-field">
+        <input type="number" id="billing-amount" step="0.01" min="0" placeholder="Billing Amount ($)">
+        <small>Enter total amount invoiced to client</small>
+      </div>
+      <div class="form-field">
+        <input type="date" id="billing-date">
+        <small>Date invoice sent to client</small>
+      </div>
+    </div>
+    <div class="form-field">
+      <input type="text" id="invoice-number" placeholder="Invoice Number (optional)">
+      <small>Optional: internal invoice tracking number</small>
+    </div>
+  </section>
+  <!-- BUTTONS -->
+  <div class="button-container">
+    <button type="button" class="btn" onclick="saveBilling()">Save</button>
+    <button type="button" class="btn btn-secondary" id="sync-btn" onclick="syncToSheets()" disabled>Sync to Sheets</button>
+    <button type="button" class="btn btn-secondary" onclick="editExisting()">Edit</button>
+    <button type="button" class="btn btn-secondary" onclick="resetForm()">Cancel</button>
+  </div>
+  <div id="sync-status" class="sync-status"></div>
+
+  <!-- QUICK LINKS -->
+  <div class="quick-links">
+    <strong>Complete:</strong>
+    <a href="dashboard.html">Dashboard</a> |
+    <a href="scorecard.html">Scorecard</a> |
+    <a href="pipeline.html">Pipeline</a>
+  </div>
+</section>
+</main>
+<footer class="site-footer">
+<div class="version-stamp">RDB Case Management v1.3</div>
+</footer>
+<script>
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzp7EWEWddYYqQMfBRcA2eriHkbbvCllS-9IOo-panx2Ve04oJThBxUINCuSN_7DwEzFg/exec';
+let isEditMode = false;
+let lastSavedBillingKey = null;
+let lastSavedCaseKey = null;
+
+window.addEventListener('DOMContentLoaded', () => {
+loadCasesForBilling();
+calculateWeeklyProgress();
+setDefaultBillingDate();
+});
+
+function setDefaultBillingDate() {
+document.getElementById('billing-date').value = new Date().toISOString().split('T')[0];
+}
+
+function loadCasesForBilling() {
+const caseSelect = document.getElementById('case-select');
+const eligible = [];
+
+for (let i = 0; i < localStorage.length; i++) {
+const key = localStorage.key(i);
+if (key.startsWith('case_')) {
+const caseData = JSON.parse(localStorage.getItem(key));
+// Filter to include these statuses for billing
+if (['Open', 'Scheduled', 'In Progress', 'Verify Documents', 'Completed'].includes(caseData.status)) {
+eligible.push({
+key,
+claimNumber: caseData.claimNumber || 'No Claim #',
+caseName: caseData.claimNumber || 'Unnamed Case',
+client: caseData.clientCompany || 'Unknown Client'
+});
+}
+}
+}
+
+caseSelect.innerHTML = '<option value="">-- Select Case --</option>';
+eligible.sort((a, b) => a.caseName.localeCompare(b.caseName));
+eligible.forEach(c => {
+const opt = document.createElement('option');
+opt.value = c.key;
+opt.textContent = `${c.claimNumber} - ${c.client}`;
+caseSelect.appendChild(opt);
+});
+}
+
+function loadCaseDetails() {
+const caseKey = document.getElementById('case-select').value;
+if (!caseKey) {
+document.getElementById('case-details').style.display = 'none';
+return;
+}
+
+const c = JSON.parse(localStorage.getItem(caseKey));
+document.getElementById('claim-number').value = c.claimNumber || '';
+document.getElementById('case-name').value = c.claimNumber || 'Unnamed Case';
+document.getElementById('client-company').value = c.clientCompany || '';
+document.getElementById('claimant-name').value = (c.claimantFirst || '') + ' ' + (c.claimantLast || '');
+document.getElementById('date-opened').value = c.assignmentDate ? new Date(c.assignmentDate).toLocaleDateString() : 'N/A';
+document.getElementById('date-completed').value = c.dateCompleted ? new Date(c.dateCompleted).toLocaleDateString() : 'N/A';
+document.getElementById('case-details').style.display = 'block';
+
+if (isEditMode && c.billingRecordId) {
+const b = JSON.parse(localStorage.getItem(c.billingRecordId));
+if (b) {
+document.getElementById('billing-amount').value = b.billingAmount;
+document.getElementById('billing-date').value = b.billingDate;
+document.getElementById('invoice-number').value = b.invoiceNumber || '';
+}
+}
+}
+
+function calculateWeeklyProgress() {
+const today = new Date();
+const start = new Date(today);
+start.setDate(today.getDate() - today.getDay());
+start.setHours(0, 0, 0, 0);
+const end = new Date(start);
+end.setDate(start.getDate() + 6);
+
+let total = 0, count = 0;
+for (let i = 0; i < localStorage.length; i++) {
+const key = localStorage.key(i);
+if (key.startsWith('billing_')) {
+const b = JSON.parse(localStorage.getItem(key));
+const d = new Date(b.billingDate);
+if (d >= start && d <= end) {
+total += parseFloat(b.billingAmount);
+count++;
+}
+}
+}
+
+const goal = 12000;
+const pct = Math.min((total / goal) * 100, 100);
+const remaining = Math.max(goal - total, 0);
+const avg = count ? total / count : 0;
+
+document.getElementById('week-total').textContent = '$' + total.toFixed(2);
+document.getElementById('remaining-amount').textContent = 'Remaining: $' + remaining.toFixed(2);
+document.getElementById('cases-count').textContent = count;
+document.getElementById('avg-amount').textContent = '$' + avg.toFixed(2);
+
+const bar = document.getElementById('progress-fill');
+bar.style.width = pct + '%';
+bar.textContent = Math.round(pct) + '%';
+bar.className = 'progress-fill ' + (pct >= 100 ? 'progress-green' : pct >= 70 ? 'progress-yellow' : 'progress-red');
+}
+
+function saveBilling() {
+const caseKey = document.getElementById('case-select').value;
+const amount = parseFloat(document.getElementById('billing-amount').value);
+const date = document.getElementById('billing-date').value;
+const invoice = document.getElementById('invoice-number').value.trim();
+
+if (!caseKey || !amount || !date) {
+alert('Please select a case, amount, and date.');
+return;
+}
+
+const caseData = JSON.parse(localStorage.getItem(caseKey));
+const billingId = 'billing_' + Date.now();
+const billingData = {
+caseKey,
+claimNumber: caseData.claimNumber,
+caseName: caseData.claimNumber || 'Unnamed Case',
+client: caseData.clientCompany,
+billingAmount: amount,
+billingDate: date,
+invoiceNumber: invoice || null,
+dateBillingEntered: new Date().toISOString(),
+enteredBy: 'Conrad',
+investigator: caseData.investigatorAssigned || 'Conrad'
+};
+
+localStorage.setItem(billingId, JSON.stringify(billingData));
+lastSavedBillingKey = billingId;
+
+caseData.status = 'Billed';
+caseData.dateBilled = date;
+caseData.billingAmount = amount;
+caseData.invoiceNumber = invoice || null;
+caseData.billingRecordId = billingId;
+caseData.closedDate = new Date().toISOString();
+localStorage.setItem(caseKey, JSON.stringify(caseData));
+lastSavedCaseKey = caseKey;
+
+calculateWeeklyProgress();
+document.getElementById('sync-btn').disabled = false;
+document.getElementById('sync-status').innerHTML = '<span style="color: var(--warning);">⚠️ Not synced to Sheets yet</span>';
+alert(`Billing saved!\n\nCase "${caseData.claimNumber}" billed for $${amount.toFixed(2)}.\nClick "Sync to Sheets" to back up.`);
+}
+
+async function syncToSheets() {
+if (!lastSavedBillingKey || !lastSavedCaseKey) {
+alert('Save first before syncing.');
+return;
+}
+
+const btn = document.getElementById('sync-btn');
+const status = document.getElementById('sync-status');
+btn.disabled = true;
+btn.textContent = 'Syncing...';
+status.innerHTML = '<span style="color: var(--accent);">⏳ Syncing...</span>';
+
+try {
+const billing = JSON.parse(localStorage.getItem(lastSavedBillingKey));
+const caseData = JSON.parse(localStorage.getItem(lastSavedCaseKey));
+
+await fetch(WEB_APP_URL, {
+method: 'POST', mode: 'no-cors',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ action: 'syncBilling', billingData: billing })
+});
+
+await fetch(WEB_APP_URL, {
+method: 'POST', mode: 'no-cors',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ action: 'syncCase', caseData })
+});
+
+status.innerHTML = `<span style="color: var(--success);">✅ Synced successfully (${new Date().toLocaleTimeString()})</span>`;
+} catch (e) {
+status.innerHTML = `<span style="color: var(--danger);">❌ Sync failed: ${e.message}</span>`;
+} finally {
+btn.textContent = 'Sync to Sheets';
+btn.disabled = false;
+}
+}
+
+function editExisting() {
+isEditMode = true;
+const select = document.getElementById('case-select');
+select.innerHTML = '<option value="">-- Select Case to Edit --</option>';
+const billed = [];
+
+for (let i = 0; i < localStorage.length; i++) {
+const key = localStorage.key(i);
+if (key.startsWith('case_')) {
+const c = JSON.parse(localStorage.getItem(key));
+if (c.billingRecordId) {
+const b = JSON.parse(localStorage.getItem(c.billingRecordId));
+billed.push({ key, claimNumber: c.claimNumber, client: c.clientCompany, amount: b.billingAmount });
+}
+}
+}
+
+billed.sort((a, b) => a.claimNumber.localeCompare(b.claimNumber));
+billed.forEach(c => {
+const opt = document.createElement('option');
+opt.value = c.key;
+opt.textContent = `${c.claimNumber} - ${c.client} ($${c.amount.toFixed(2)})`;
+select.appendChild(opt);
+});
+
+alert('Edit mode enabled. Select a billed case to modify.');
+}
+
+function resetForm() {
+isEditMode = false;
+document.getElementById('case-select').value = '';
+document.getElementById('billing-amount').value = '';
+document.getElementById('invoice-number').value = '';
+setDefaultBillingDate();
+document.getElementById('case-details').style.display = 'none';
+loadCasesForBilling();
+}
+</script>
+</body>
+</html>
