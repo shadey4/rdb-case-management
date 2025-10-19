@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', function() {
-    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwmvNiKXem35CG_W8MjgXdypMN9Lfho6dI3nGt5z_nVVC9RIww7Me42HklRBTBIWIa_Qw/exec';
+    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwS2Ah2qP19aGcnvBnNlBwb9RFeUeID-zCuxjhQcMfpjEY0ppdSs7eHxYxTXaBCbxWGMA/exec';
     let lastSavedCaseKey = null; // To track the last saved form for Sheets sync
 
     // ===== Load or initialize stored data =====
