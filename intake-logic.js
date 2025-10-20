@@ -383,9 +383,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Send the caseData to Google Sheets
             await fetch(WEB_APP_URL, {
                 method: 'POST',
-                // mode: 'no-cors' is typically used for simple requests. If the script expects JSON,
-                // it might need a 'cors' mode and proper CORS headers on the server side.
-                // Assuming 'no-cors' works for Google Apps Script for now.
+                mode: 'cors',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'syncCase', caseData })
             });

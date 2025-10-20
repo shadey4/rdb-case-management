@@ -301,13 +301,13 @@ const billing = JSON.parse(localStorage.getItem(lastSavedBillingKey));
 const caseData = JSON.parse(localStorage.getItem(lastSavedCaseKey));
 
 await fetch(WEB_APP_URL, {
-method: 'POST', mode: 'no-cors',
+method: 'POST', mode: 'cors',
 headers: { 'Content-Type': 'application/json' },
 body: JSON.stringify({ action: 'syncBilling', billingData: billing })
 });
 
 await fetch(WEB_APP_URL, {
-method: 'POST', mode: 'no-cors',
+method: 'POST', mode: 'cors',
 headers: { 'Content-Type': 'application/json' },
 body: JSON.stringify({ action: 'syncCase', caseData })
 });
