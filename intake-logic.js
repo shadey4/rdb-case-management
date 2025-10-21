@@ -374,48 +374,55 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         const caseId = localData.currentForm.caseId;
 
-        // Collect all form data into a single object, including non-entity fields
+        // Collect all general (non-entity) form data
         const formData = {};
-        document.querySelectorAll('input, select, textarea').forEach(f => {
+        document.querySelectorAll('input:not([data-section]), select:not([data-section]), textarea:not([data-section])')
+        .forEach(f => {
             if (f.id) formData[f.id] = f.value;
         });
 
+            // Normalize core metadata fields
             formData.caseId = caseId;
-
-            // Normalize general form fields for compatibility with potential Sheets sync
             formData.claimNumber = formData.assignmentClaimNumber || '';
             formData.status = formData.assignmentStatus || 'Open';
             formData.investigatorAssigned = formData.investigatorName || '';
             formData.dateCreated = new Date().toISOString();
 
+            // Split claimant full name into first and last
             const cName = (formData.claimantName || '').trim().split(' ');
             formData.claimantFirst = cName[0] || '';
             formData.claimantLast = cName.slice(1).join(' ') || '';
 
-            // Merge collected individual entity data from localData.savedCases into formData
-            // This ensures the "full form" includes the isolated entity objects
-            if (localData.savedCases[caseId]) {
-                namedEntitySections.forEach(section => {
-                    if (localData.savedCases[caseId][section]) {
-                        formData[section] = localData.savedCases[caseId][section];
-                    }
-                });
-            }
+            // --- Preserve isolated entity objects (do not flatten them) ---
+            if (!localData.savedCases[caseId]) localData.savedCases[caseId] = {};
+            namedEntitySections.forEach(section => {
+                if (!localData.savedCases[caseId][section]) {
+                    localData.savedCases[caseId][section] = {};
+                }
+            });
 
-            // --- Store the complete formData for this caseId ---
-            // This is the complete, flattened view of the form including nested entities
-            localData.savedCases[caseId] = formData;
+            // Merge current saved case with updated general form data
+            localData.savedCases[caseId] = {
+                ...localData.savedCases[caseId],
+                ...formData
+            };
+
+            // Save back to localStorage
             localStorage.setItem('intakeData', JSON.stringify(localData));
-            lastSavedCaseKey = caseId; // Update tracking for sync
+            lastSavedCaseKey = caseId;
 
+            // Enable sync button and update status
             document.getElementById('sync-btn').disabled = false;
-            document.getElementById('sync-status').innerHTML = '<span style="color: var(--warning);">⚠️ Not synced to Sheets yet</span>';
+            document.getElementById('sync-status').innerHTML =
+            '<span style="color: var(--warning);">⚠️ Not synced to Sheets yet</span>';
+
             alert('Intake form saved to localStorage!\n\nClick "Sync to Sheets" to back up to Google Sheets.');
 
-            // Update currentForm to reflect the just-saved state, ensuring caseId is preserved
-            localData.currentForm = { ...formData }; // Overwrite currentForm with the complete form data
+            // Update currentForm to reflect just-saved state
+            localData.currentForm = { ...localData.currentForm, ...formData };
             localStorage.setItem('intakeData', JSON.stringify(localData));
     }
+}
 
     async function syncToSheets() {
         if (!localData.currentForm.caseId) return alert('Please save first.');
