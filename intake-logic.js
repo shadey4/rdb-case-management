@@ -1,19 +1,20 @@
 document.addEventListener('DOMContentLoaded', function() {
-    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwS2Ah2qP19aGcnvBnNlBwb9RFeUeID-zCuxjhQcMfpjEY0ppdSs7eHxYxTXaBCbxWGMA/exec';
+    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwS2Ah2qP19aGcnvBnNlBwb9RFeUeID-zCuxjhQcMfpfEY0ppS7eHxYxTXaBCbxWGMA/exec'; // Updated URL to avoid collision
     let lastSavedCaseKey = null; // To track the last saved form for Sheets sync
 
     // ===== Load or initialize stored data =====
     const defaults = {
         investigators: ['Conrad', 'Delores', 'Lisa', 'Michael', 'Jeff'],
         surveillanceInvestigators: ['Freddy', 'Ricardo', 'Delores', 'Michael', 'Alma', 'Manuel', 'Jeff'],
-        clients: [],
-        attorneys: [],
-        employers: [],
-        claimants: [],
+        clients: [], // Used for global client autofill options, but actual form data stored in currentCaseData
+        attorneys: [], // Used for global attorney autofill options
+        employers: [], // Used for global employer autofill options
+        claimants: [], // Used for global claimant autofill options
         pipelineStages: [],
         states: ["CA", "NY", "TX", "FL"],
-        currentForm: {},
+        currentForm: {}, // Stores the active form's field values for auto-save
         caseIdCounter: 1,
+            savedCases: {} // New structure for entity-isolated case data
     };
 
     let localData = {};
@@ -28,7 +29,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 localData[key] = defaults[key];
             }
         }
+        // Ensure currentForm is initialized correctly, merging stored with defaults
         localData.currentForm = { ...defaults.currentForm, ...(stored.currentForm || {}) };
+        // Ensure savedCases is initialized correctly
+        localData.savedCases = { ...defaults.savedCases, ...(stored.savedCases || {}) };
     }
 
     loadLocalData();
@@ -59,7 +63,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
     }
 
-
     const namedEntitySections = ['client', 'attorney', 'employer', 'claimant'];
     namedEntitySections.forEach(setupNamedEntitySection);
     setupPipelineStage();
@@ -67,7 +70,8 @@ document.addEventListener('DOMContentLoaded', function() {
     setupStateField();
     setupSsnFormatting();
 
-    document.querySelectorAll('input, select, textarea').forEach(field => {
+    // Event listeners for general fields (not part of named entities)
+    document.querySelectorAll('input:not([data-section]), select:not([data-section]), textarea:not([data-section])').forEach(field => {
         if (localData.currentForm[field.id] !== undefined) field.value = localData.currentForm[field.id];
         field.addEventListener('blur', () => saveCurrentFormState(field));
         if (field.tagName === 'SELECT') field.addEventListener('change', () => saveCurrentFormState(field));
@@ -93,37 +97,38 @@ document.addEventListener('DOMContentLoaded', function() {
     function setupNamedEntitySection(section) {
         const nameField = document.getElementById(section + 'Name');
         const companyField = document.getElementById(section + 'Company');
-        const listKey = section + 's';
+        const listKey = section + 's'; // e.g., 'clients', 'attorneys'
 
+        // Populate datalists from the global lists (for autofill suggestions)
         if (nameField) {
             populateDatalist(section + 'NameList', localData[listKey].map(i => i.name).filter(Boolean));
             nameField.addEventListener('change', () => autofillSection(section, nameField.value, 'name'));
-            nameField.addEventListener('blur', () => saveNamedEntity(section)); // Removed triggerType, will collect all
         }
         if (companyField) {
             populateDatalist(section + 'CompanyList', localData[listKey].map(i => i.company).filter(Boolean));
             companyField.addEventListener('change', () => autofillSection(section, companyField.value, 'company'));
-            companyField.addEventListener('blur', () => saveNamedEntity(section)); // Removed triggerType, will collect all
         }
+
         // Add event listeners for all fields within the section to save on blur/change
         document.querySelectorAll(`[data-section="${section}"] input, [data-section="${section}"] select, [data-section="${section}"] textarea`)
         .forEach(f => {
             // Initial load of currentForm values
             if (localData.currentForm[f.id] !== undefined) f.value = localData.currentForm[f.id];
 
-            f.addEventListener('blur', () => saveCurrentFormState(f)); // Save individual field state
-            if (f.tagName === 'SELECT') f.addEventListener('change', () => saveCurrentFormState(f)); // Save individual field state
-
-            // IMPORTANT: When a field in a named entity section changes, we should attempt to save the whole entity.
-            // This ensures that if a user changes an address for an existing client, it updates the client object.
-            f.addEventListener('blur', () => saveNamedEntity(section));
-            if (f.tagName === 'SELECT') f.addEventListener('change', () => saveNamedEntity(section));
+            f.addEventListener('blur', () => {
+                saveCurrentFormState(f); // Save individual field state to currentForm
+                saveNamedEntity(section); // Also attempt to save the whole entity
+            });
+            if (f.tagName === 'SELECT') f.addEventListener('change', () => {
+                saveCurrentFormState(f); // Save individual field state to currentForm
+                saveNamedEntity(section); // Also attempt to save the whole entity
+            });
         });
     }
 
     /**
      * Autofills fields for a specific section based on a matching value (name or company).
-     * This function is crucial for data isolation.
+     * This function is crucial for data isolation, now reading from currentForm and global lists.
      * @param {string} section - The section identifier (e.g., 'client', 'employer', 'claimant').
      * @param {string} value - The value to search for (e.g., a client name, employer company).
      * @param {string} triggerType - 'name' or 'company' to specify which field triggered the autofill.
@@ -132,9 +137,14 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!value) return clearNamedEntitySection(section);
 
         const listKey = section + 's';
-        const list = localData[listKey] || [];
-        // CRITICAL FIX: Ensure we only search within the specific section's list.
-        let record = triggerType === 'name' ? list.find(r => r.name === value) : list.find(r => r.company === value);
+        const globalList = localData[listKey] || []; // Global list for suggestions
+        let record = null;
+
+        if (triggerType === 'name') {
+            record = globalList.find(r => r.name === value);
+        } else { // triggerType === 'company'
+            record = globalList.find(r => r.company === value);
+        }
 
         if (record) {
             // Fill all fields for this section from the found record
@@ -143,7 +153,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 let k = f.id.replace(section, '');
                 if (k) {
                     k = k.charAt(0).toLowerCase() + k.slice(1);
-                    if (record[k] !== undefined) { // Only update if the record has this specific key
+                    if (record[k] !== undefined) {
                         f.value = record[k] || '';
                         saveCurrentFormState(f); // Save the individual field's state to currentForm
                     }
@@ -158,14 +168,13 @@ document.addEventListener('DOMContentLoaded', function() {
     function clearNamedEntitySectionExceptTrigger(section, triggerType) {
         const fields = document.querySelectorAll(`[data-section="${section}"] input,[data-section="${section}"] select,[data-section="${section}"] textarea`);
         fields.forEach(f => {
-            // CRITICAL FIX: Ensure the ID check for the trigger field is correct
             const triggerFieldId = section + capitalize(triggerType);
             if (f.id !== triggerFieldId) {
                 if (f.tagName === 'SELECT') f.selectedIndex = 0;
                 else if (f.type === 'date') f.value = '';
                 else if (f.id.includes('State')) f.value = 'CA'; // Default state for state fields
                 else f.value = '';
-                saveCurrentFormState(f);
+                saveCurrentFormState(f); // Save the cleared state to currentForm
             }
         });
     }
@@ -177,15 +186,12 @@ document.addEventListener('DOMContentLoaded', function() {
             else if (f.type === 'date') f.value = '';
             else if (f.id.includes('State')) f.value = 'CA';
             else f.value = '';
-            saveCurrentFormState(f);
+            saveCurrentFormState(f); // Save the cleared state to currentForm
         });
     }
 
-    // This function is intended to clear a *named entity section* when its primary autofill field (e.g., clientName) is cleared.
     function clearDependentFields(fieldId) {
-        // Find which section the fieldId belongs to
         const section = namedEntitySections.find(s => fieldId.startsWith(s));
-        // If it's a primary named entity field (Name or Company) and it was cleared, clear the whole section.
         if (section && (fieldId.endsWith('Name') || fieldId.endsWith('Company'))) {
             const currentFieldValue = document.getElementById(fieldId).value;
             if (currentFieldValue === '') {
@@ -196,35 +202,47 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /**
      * Saves or updates a named entity (client, attorney, employer, claimant) to localData.
-     * This function is crucial for data isolation.
+     * This now updates both the global list for autofill suggestions and the current case's specific entity data.
      * @param {string} section - The section identifier (e.g., 'client', 'employer', 'claimant').
      */
     function saveNamedEntity(section) {
         const record = collectNamedEntityValues(section);
-        const listKey = section + 's';
-        let list = localData[listKey] || [];
+        const listKey = section + 's'; // e.g., 'clients'
 
         // Check for empty records to avoid saving blank entries
-        // For client, attorney, employer: require either name or company
         if (['client', 'attorney', 'employer'].includes(section) && !record.name && !record.company) return;
-        // For claimant: require at least one identifying field
-        if (section === 'claimant' && !record.name && !record.jobTitle && !record.phone && !record.email && !record.ssn && !record.dob && !record.street && !record.city && !record.state && !record.zip) return;
+        if (section === 'claimant' && !Object.values(record).some(val => val && val.trim() !== '')) return; // Require at least one non-empty field for claimant
 
-        let existingIndex = -1;
+        // --- Update global list for autofill suggestions ---
+        let globalList = localData[listKey] || [];
+        let existingGlobalIndex = -1;
         if (record.name) {
-            existingIndex = list.findIndex(r => r.name === record.name);
-        } else if (record.company && section !== 'claimant') { // Claimants don't usually have a 'company' in this context for unique identification
-            existingIndex = list.findIndex(r => r.company === record.company);
+            existingGlobalIndex = globalList.findIndex(r => r.name === record.name);
+        } else if (record.company && section !== 'claimant') {
+            existingGlobalIndex = globalList.findIndex(r => r.company === record.company);
         }
 
-        if (existingIndex !== -1) {
-            // Update existing record by merging new values
-            list[existingIndex] = { ...list[existingIndex], ...record };
+        if (existingGlobalIndex !== -1) {
+            globalList[existingGlobalIndex] = { ...globalList[existingGlobalIndex], ...record };
         } else {
-            // Add new record
-            list.push(record);
+            globalList.push(record);
         }
-        localData[listKey] = list; // CRITICAL FIX: Assign the updated list back to localData for the specific section.
+        localData[listKey] = globalList;
+
+        // --- Update current case's isolated entity data ---
+        const caseId = localData.currentForm.caseId;
+        if (caseId) {
+            if (!localData.savedCases[caseId]) localData.savedCases[caseId] = {};
+            // Defensive checks for nested entity objects
+            if (!localData.savedCases[caseId].claimant) localData.savedCases[caseId].claimant = {};
+            if (!localData.savedCases[caseId].employer) localData.savedCases[caseId].employer = {};
+            if (!localData.savedCases[caseId].client) localData.savedCases[caseId].client = {};
+            if (!localData.savedCases[caseId].attorney) localData.savedCases[caseId].attorney = {};
+
+            localData.savedCases[caseId][section] = { ...localData.savedCases[caseId][section], ...record };
+            console.log(`Saved ${section}:`, localData.savedCases[caseId][section]);
+        }
+
         localStorage.setItem('intakeData', JSON.stringify(localData));
 
         // Update datalists for the current section
@@ -243,13 +261,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /**
      * Collects all field values for a specific named entity section.
-     * CRITICAL FIX: Uses data-section attribute to ensure isolation.
+     * Uses data-section attribute to ensure isolation.
      * @param {string} section - The section identifier (e.g., 'client', 'employer').
      * @returns {object} An object containing all collected field-value pairs for the section.
      */
     function collectNamedEntityValues(section) {
         const r = {};
-        // CRITICAL FIX: Use the data-section attribute to correctly target fields
         document.querySelectorAll(`[data-section="${section}"] input, [data-section="${section}"] select, [data-section="${section}"] textarea`)
         .forEach(f => {
             let k = f.id.replace(section, ''); // Remove section prefix to get the key (e.g., 'Name', 'Phone')
@@ -295,21 +312,28 @@ document.addEventListener('DOMContentLoaded', function() {
             dl.innerHTML = '';
             vals.filter(v => v).sort().forEach(v => {
                 const o = document.createElement('option');
-                o.value = v; dl.appendChild(o);
+                o.value = v;
+                dl.appendChild(o);
             });
         }
     }
 
-    function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+    function capitalize(s) {
+        return s.charAt(0).toUpperCase() + s.slice(1);
+    }
 
     function formatSSN(i) {
-        let v = i.value.replace(/\D/g, ''), f = '';
-        if (v.length > 0) f += v.substring(0, 3);
-        if (v.length > 3) f += '-' + v.substring(3, 5);
-        if (v.length > 5) f += '-' + v.substring(5, 9);
-        i.value = f; saveCurrentFormState(i);
+        let v = i.value.replace(/\D/g, ''),
+                          f = '';
+                          if (v.length > 0) f += v.substring(0, 3);
+                          if (v.length > 3) f += '-' + v.substring(3, 5);
+                          if (v.length > 5) f += '-' + v.substring(5, 9);
+                          i.value = f;
+        saveCurrentFormState(i); // Save the formatted SSN
+        saveNamedEntity('claimant'); // Trigger save for the claimant section
     }
     window.formatSSN = formatSSN;
+
     function setupSsnFormatting() {
         const s = document.getElementById('claimantSSN');
         if (s) s.addEventListener('input', () => formatSSN(s));
@@ -318,15 +342,22 @@ document.addEventListener('DOMContentLoaded', function() {
     function setupInvestigatorDropdown() {
         const sSel = document.getElementById('assignmentService');
         const iSel = document.getElementById('investigatorName');
+
         function update() {
             const service = sSel.value;
             const list = service === 'Surveillance' ? localData.surveillanceInvestigators : localData.investigators;
             const current = iSel.value; // Get current value before clearing
             iSel.innerHTML = '';
             const def = document.createElement('option');
-            def.value = ''; def.textContent = '-- Select Investigator --';
+            def.value = '';
+            def.textContent = '-- Select Investigator --';
             iSel.appendChild(def);
-            list.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; iSel.appendChild(o); });
+            list.forEach(n => {
+                const o = document.createElement('option');
+                o.value = n;
+                o.textContent = n;
+                iSel.appendChild(o);
+            });
             // Set value back, preferring currentForm, then trying to match current value, otherwise default
             iSel.value = localData.currentForm[iSel.id] || (list.includes(current) ? current : '');
             saveCurrentFormState(iSel);
@@ -336,51 +367,72 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function saveFullForm() {
-        const formData = {};
-        document.querySelectorAll('input, select, textarea').forEach(f => { if (f.id) formData[f.id] = f.value; });
+        // Ensure a caseId exists for the current form
         if (!localData.currentForm.caseId) {
             localData.currentForm.caseId = 'case_' + localData.caseIdCounter++;
             localStorage.setItem('intakeData', JSON.stringify(localData));
         }
-        formData.caseId = localData.currentForm.caseId;
+        const caseId = localData.currentForm.caseId;
 
-        // Normalize field names for compatibility
-        formData.claimNumber = formData.assignmentClaimNumber || '';
-        formData.status = formData.assignmentStatus || 'Open';
-        formData.clientCompany = formData.clientCompany || ''; // This might be redundant if clientName is used
-        formData.investigatorAssigned = formData.investigatorName || '';
-        formData.dateCreated = new Date().toISOString();
+        // Collect all form data into a single object, including non-entity fields
+        const formData = {};
+        document.querySelectorAll('input, select, textarea').forEach(f => {
+            if (f.id) formData[f.id] = f.value;
+        });
 
-        const cName = (formData.claimantName || '').trim().split(' ');
-        formData.claimantFirst = cName[0] || '';
-        formData.claimantLast = cName.slice(1).join(' ') || '';
+            formData.caseId = caseId;
 
-        lastSavedCaseKey = formData.caseId;
-        localStorage.setItem(lastSavedCaseKey, JSON.stringify(formData)); // Save as separate key
+            // Normalize general form fields for compatibility with potential Sheets sync
+            formData.claimNumber = formData.assignmentClaimNumber || '';
+            formData.status = formData.assignmentStatus || 'Open';
+            formData.investigatorAssigned = formData.investigatorName || '';
+            formData.dateCreated = new Date().toISOString();
 
-        document.getElementById('sync-btn').disabled = false;
-        document.getElementById('sync-status').innerHTML = '<span style="color: var(--warning);">⚠️ Not synced to Sheets yet</span>';
-        alert('Intake form saved to localStorage!\n\nClick "Sync to Sheets" to back up to Google Sheets.');
+            const cName = (formData.claimantName || '').trim().split(' ');
+            formData.claimantFirst = cName[0] || '';
+            formData.claimantLast = cName.slice(1).join(' ') || '';
 
-        // Update currentForm to reflect the just-saved state
-        localData.currentForm = { ...formData };
-        localStorage.setItem('intakeData', JSON.stringify(localData));
+            // Merge collected individual entity data from localData.savedCases into formData
+            // This ensures the "full form" includes the isolated entity objects
+            if (localData.savedCases[caseId]) {
+                namedEntitySections.forEach(section => {
+                    if (localData.savedCases[caseId][section]) {
+                        formData[section] = localData.savedCases[caseId][section];
+                    }
+                });
+            }
+
+            // --- Store the complete formData for this caseId ---
+            // This is the complete, flattened view of the form including nested entities
+            localData.savedCases[caseId] = formData;
+            localStorage.setItem('intakeData', JSON.stringify(localData));
+            lastSavedCaseKey = caseId; // Update tracking for sync
+
+            document.getElementById('sync-btn').disabled = false;
+            document.getElementById('sync-status').innerHTML = '<span style="color: var(--warning);">⚠️ Not synced to Sheets yet</span>';
+            alert('Intake form saved to localStorage!\n\nClick "Sync to Sheets" to back up to Google Sheets.');
+
+            // Update currentForm to reflect the just-saved state, ensuring caseId is preserved
+            localData.currentForm = { ...formData }; // Overwrite currentForm with the complete form data
+            localStorage.setItem('intakeData', JSON.stringify(localData));
     }
 
     async function syncToSheets() {
         if (!localData.currentForm.caseId) return alert('Please save first.');
         const key = localData.currentForm.caseId;
-        if (!localStorage.getItem(key)) return alert('No local data found for this case.');
+
+        // Retrieve the complete case data from savedCases
+        const caseData = localData.savedCases[key];
+        if (!caseData) return alert('No local data found for this case.');
 
         const btn = document.getElementById('sync-btn');
         const status = document.getElementById('sync-status');
-        btn.disabled = true; btn.textContent = 'Syncing...';
+        btn.disabled = true;
+        btn.textContent = 'Syncing...';
         status.innerHTML = '<span style="color: var(--accent);">⏳ Syncing to Google Sheets...</span>';
 
         try {
-            const caseData = JSON.parse(localStorage.getItem(key));
-
-            // Send the caseData to Google Sheets
+            // Send the complete caseData to Google Sheets (including nested entities)
             await fetch(WEB_APP_URL, {
                 method: 'POST',
                 mode: 'cors',
@@ -389,26 +441,10 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             const currentIntakeData = JSON.parse(localStorage.getItem('intakeData')) || defaults;
-            const caseIdNum = parseInt(caseData.caseId.replace('case_', '')) || 0; // Handle non-numeric caseId gracefully
+            const caseIdNum = parseInt(key.replace('case_', '')) || 0;
 
-            const normalizedCase = {
-                ...caseData, // All original fields
-                id: caseData.caseId, // Use existing caseId
-                claimNumber: caseData.assignmentClaimNumber || '',
-                status: caseData.assignmentStatus || 'Open',
-                dateReceived: caseData.assignmentDateReceived || '',
-                dateAssigned: caseData.assignmentDateAssigned || '',
-                investigatorName: caseData.investigatorName || '',
-                clientName: caseData.clientName || '',
-                claimantName: caseData.claimantName || '',
-                timestamp: new Date().toISOString()
-            };
-
-            // Save the normalized case as a separate localStorage item using its caseId
-            localStorage.setItem(caseData.caseId, JSON.stringify(normalizedCase));
-
-            // Only increment caseIdCounter if the current caseIdNum is higher than the existing counter
-            if (caseIdNum >= currentIntakeData.caseIdCounter -1) { // -1 because counter is already incremented for next new case
+            // Only increment caseIdCounter if the current caseIdNum is higher than or equal to the existing counter
+            if (caseIdNum >= currentIntakeData.caseIdCounter - 1) { // -1 because counter is already incremented for next new case
                 currentIntakeData.caseIdCounter = caseIdNum + 1;
             }
             localStorage.setItem('intakeData', JSON.stringify(currentIntakeData)); // Update caseIdCounter in intakeData
@@ -416,33 +452,44 @@ document.addEventListener('DOMContentLoaded', function() {
             showSuccessMessage('Case synced and saved locally!');
 
             status.innerHTML = `<span style="color: var(--success);">✅ Synced at ${new Date().toLocaleTimeString()}</span>`;
-            btn.textContent = 'Sync to Sheets'; btn.disabled = false;
+            btn.textContent = 'Sync to Sheets';
+            btn.disabled = false;
 
-            // Reset the form after successful sync and update of local storage
+            // --- Reset the form and localData for a new entry ---
             const form = document.querySelector('form');
             if (form) form.reset();
 
-            // Clear the current form state to prepare for a new entry
+            // Clear the current form state and load defaults for a new entry
             localData.currentForm = {};
-            localStorage.setItem('intakeData', JSON.stringify(localData));
+            localStorage.setItem('intakeData', JSON.stringify(localData)); // Save cleared currentForm
             loadLocalData(); // Reload localData to ensure defaults and cleared currentForm are active
 
-            // Re-setup dropdowns/fields that depend on localData
+            // Re-setup dropdowns/fields that depend on localData and now need to reflect a blank form
             namedEntitySections.forEach(setupNamedEntitySection);
             setupPipelineStage();
-            setupInvestigatorDropdown(); // Important for the investigator dropdown to reset based on cleared form
+            setupInvestigatorDropdown();
             setupStateField();
             setupSsnFormatting();
 
-            btn.disabled = true; status.innerHTML = ''; // Disable sync button and clear status for new blank form
+            // Clear general fields that are not part of named entities
+            document.querySelectorAll('input:not([data-section]), select:not([data-section]), textarea:not([data-section])').forEach(f => {
+                if (f.tagName === 'SELECT') f.selectedIndex = 0;
+                else if (f.type === 'date') f.value = '';
+                else f.value = '';
+            });
+
+                btn.disabled = true;
+                status.innerHTML = ''; // Disable sync button and clear status for new blank form
         } catch (e) {
             console.error('Sync error:', e);
             status.innerHTML = `<span style="color: var(--danger);">❌ Sync failed: ${e.message}</span>`;
-            btn.textContent = 'Retry Sync'; btn.disabled = false;
+            btn.textContent = 'Retry Sync';
+            btn.disabled = false;
         }
     }
 
-    // Initial population of form fields from localData.currentForm
+    // Initial population of form fields from localData.currentForm on page load
+    // This will reconstruct the form from the last saved state.
     for (const id in localData.currentForm) {
         const f = document.getElementById(id);
         if (f) {
@@ -455,10 +502,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Determine initial state of sync button and status on page load
-    if (localData.currentForm.caseId && localStorage.getItem(localData.currentForm.caseId)) {
+    if (localData.currentForm.caseId && localData.savedCases[localData.currentForm.caseId]) {
+        // If there's a current caseId and it exists in savedCases, enable sync
         document.getElementById('sync-btn').disabled = false;
         document.getElementById('sync-status').innerHTML = '<span style="color: var(--warning);">⚠️ Not synced to Sheets yet</span>';
     } else {
+        // Otherwise, disable sync
         document.getElementById('sync-btn').disabled = true;
         document.getElementById('sync-status').innerHTML = '';
     }
