@@ -280,7 +280,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function setupPipelineStage() {
         const f = document.getElementById('assignmentPipelineStage');
-        if (f) { populateDatalist('pipelineStageList', localData.pipelineStages); f.addEventListener('blur', () => savePipelineStage(f.value)); }
+        if (f) {
+            populateDatalist('pipelineStageList', localData.pipelineStages);
+            f.addEventListener('blur', () => savePipelineStage(f.value));
+        }
     }
 
     function savePipelineStage(v) {
@@ -422,7 +425,7 @@ document.addEventListener('DOMContentLoaded', function() {
             localData.currentForm = { ...localData.currentForm, ...formData };
             localStorage.setItem('intakeData', JSON.stringify(localData));
     }
-}
+
 
     async function syncToSheets() {
         if (!localData.currentForm.caseId) return alert('Please save first.');
@@ -510,12 +513,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Determine initial state of sync button and status on page load
     if (localData.currentForm.caseId && localData.savedCases[localData.currentForm.caseId]) {
-        // If there's a current caseId and it exists in savedCases, enable sync
         document.getElementById('sync-btn').disabled = false;
-        document.getElementById('sync-status').innerHTML = '<span style="color: var(--warning);">⚠️ Not synced to Sheets yet</span>';
+        document.getElementById('sync-status').innerHTML =
+        '<span style="color: var(--warning);">⚠️ Not synced to Sheets yet</span>';
     } else {
-        // Otherwise, disable sync
         document.getElementById('sync-btn').disabled = true;
         document.getElementById('sync-status').innerHTML = '';
     }
-});
+
+    // Move this closing bracket to the very bottom of the file
+}); // ← this must now be the final line of intake-logic.js
